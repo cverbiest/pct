@@ -263,7 +263,6 @@
       <fileset dir="${build-java}">
         <include name="**/*.class" />
         <include name="**/*.properties" />
-        <include name="**/jaxb.index" />
       </fileset>
       <fileset dir="${build}">
         <include name="pct10.pl" />
@@ -274,6 +273,7 @@
       <fileset dir="${src.java}">
         <include name="eu/rssw/pct/antlib.xml" />
         <include name="eu/rssw/pct/oedoc/antlib.xml" />
+        <include name="eu/rssw/rcode/jaxb.index" />
       </fileset>
    	  <zipfileset src="lib/gson-2.2.4.jar" />
       <zipfileset src="lib/profiler-parser-shaded-1.4.1.jar" includes="**/*.class" />
