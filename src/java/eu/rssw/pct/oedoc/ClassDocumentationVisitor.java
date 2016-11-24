@@ -24,10 +24,12 @@ import java.util.List;
 
 import javax.xml.bind.JAXBException;
 
-import antlr.CommonHiddenStreamToken;
-
+import com.openedge.core.metadata.DataTypes;
+import com.openedge.core.metadata.IDataType;
 import com.openedge.pdt.core.ast.ASTNode;
 import com.openedge.pdt.core.ast.ConstructorDeclaration;
+import com.openedge.pdt.core.ast.EnumDeclaration;
+import com.openedge.pdt.core.ast.EnumeratorItem;
 import com.openedge.pdt.core.ast.EventDeclaration;
 import com.openedge.pdt.core.ast.MethodDeclaration;
 import com.openedge.pdt.core.ast.ProgressParserTokenTypes;
@@ -42,9 +44,11 @@ import com.openedge.pdt.core.ast.model.IASTNode;
 import com.openedge.pdt.core.ast.model.IParameter;
 import com.openedge.pdt.core.ast.visitor.ASTVisitor;
 
+import antlr.CommonHiddenStreamToken;
 import eu.rssw.rcode.AccessModifier;
 import eu.rssw.rcode.ClassCompilationUnit;
 import eu.rssw.rcode.Constructor;
+import eu.rssw.rcode.EnumMember;
 import eu.rssw.rcode.Event;
 import eu.rssw.rcode.GetSetModifier;
 import eu.rssw.rcode.Method;
@@ -58,6 +62,7 @@ public class ClassDocumentationVisitor extends ASTVisitor {
     private ClassCompilationUnit cu = new ClassCompilationUnit();
     private boolean firstTokenVisited = false;
     private List<String> firstComments = new ArrayList<String>();
+    private boolean gotEnum = false;
 
     public String getPackageName() {
         if (cu.packageName == null)
@@ -88,6 +93,36 @@ public class ClassDocumentationVisitor extends ASTVisitor {
         return true;
     }
 
+    public boolean visit(TypeName name) {
+        if (cu.isEnum && gotEnum) {
+            int pos = name.getQualifiedName().lastIndexOf('.');
+            if (pos == -1) {
+                cu.className = name.getQualifiedName();
+            } else {
+                cu.packageName = name.getQualifiedName().substring(0, pos);
+                cu.className = name.getQualifiedName().substring(pos + 1);
+            }
+        }
+        return true;
+    }
+
+    public boolean visit(EnumDeclaration decl) {
+        cu.isEnum = true;
+        gotEnum = true;
+        cu.classComment.addAll(firstComments);
+        cu.classComment.add(findPreviousComment(decl));
+
+        return true;
+    }
+
+    public boolean visit(EnumeratorItem item) {
+        EnumMember member = new EnumMember(item.toString());
+        member.memberComment = findPreviousComment(item);
+        cu.enumMembers.add(member);
+
+        return true;
+    }
+
     public boolean visit(TypeDeclaration decl) {
         cu.packageName = decl.getPackageName();
         cu.className = decl.getClassName();
@@ -95,6 +130,7 @@ public class ClassDocumentationVisitor extends ASTVisitor {
         cu.isAbstract = decl.isAbstract();
         cu.isFinal = decl.isFinal();
         cu.classComment.addAll(firstComments);
+        cu.classComment.add(findPreviousComment(decl));
 
         if (decl.getInherits() != null)
             cu.inherits = decl.getInherits().getQualifiedName();
@@ -114,7 +150,15 @@ public class ClassDocumentationVisitor extends ASTVisitor {
             prop.isStatic |= (zz == ProgressParserTokenTypes.STATIC);
         }
         prop.isAbstract = decl.isAbstract();
-        prop.dataType = decl.getDataType().getName();
+        if (decl.getDataType() == null) {
+            prop.dataType = "";
+        } else {
+            IDataType idt = DataTypes.getDataType(decl.getDataType().getName());
+            if (idt != null)
+                prop.dataType = idt.getABLName(true);
+            else
+                prop.dataType = decl.getDataType().getName();
+        }
         prop.extent = decl.getExtent();
         prop.modifier = AccessModifier.from(decl.getAccessModifier());
         prop.propertyComment = findPreviousComment(decl);
@@ -159,7 +203,15 @@ public class ClassDocumentationVisitor extends ASTVisitor {
             for (IParameter p : decl.getParameters()) {
                 Parameter param = new Parameter();
                 param.name = p.getName();
-                param.dataType = p.getDataType().getName();
+                if (p.getDataType() == null) {
+                    param.dataType = "";
+                } else {
+                    IDataType idt = DataTypes.getDataType(p.getDataType().getName());
+                    if (idt != null)
+                        param.dataType = idt.getABLName(true);
+                    else
+                        param.dataType = p.getDataType().getName();
+                }
                 param.position = p.getPosition();
                 param.mode = ParameterMode.from(p.getMode());
                 constr.parameters.add(param);
@@ -192,7 +244,11 @@ public class ClassDocumentationVisitor extends ASTVisitor {
                 if (p.getDataType() == null) {
                     param.dataType = "";
                 } else {
-                    param.dataType = p.getDataType().getName();
+                    IDataType idt = DataTypes.getDataType(p.getDataType().getName());
+                    if (idt != null)
+                        param.dataType = idt.getABLName(true);
+                    else
+                        param.dataType = p.getDataType().getName();
                 }
                 param.position = p.getPosition();
                 param.mode = ParameterMode.from(p.getMode());
@@ -222,7 +278,11 @@ public class ClassDocumentationVisitor extends ASTVisitor {
             for (IParameter p : decl.getParameters()) {
                 Parameter param = new Parameter();
                 param.name = p.getName();
-                param.dataType = p.getDataType().getName();
+                IDataType idt = DataTypes.getDataType(p.getDataType().getName());
+                if (idt != null)
+                    param.dataType = idt.getABLName(true);
+                else
+                    param.dataType = p.getDataType().getName();
                 param.position = p.getPosition();
                 param.mode = ParameterMode.from(p.getMode());
                 event.parameters.add(param);
@@ -258,16 +318,18 @@ public class ClassDocumentationVisitor extends ASTVisitor {
      * @return
      */
     public static String findPreviousComment(ASTNode node) {
-      if ((node.getHiddenPrevious() != null) && (node.getHiddenPrevious().getType() == ProgressTokenTypes.ML__COMMENT)) {
-        return node.getHiddenPrevious().getText();
-      }
-      IASTNode n = node.getPrevSibling();
-      while ((n != null) && (n.getType() == ProgressParserTokenTypes.ANNOTATION)) {
-        if ((n.getHiddenPrevious() != null) && (n.getHiddenPrevious().getType() == ProgressTokenTypes.ML__COMMENT))
-          return n.getHiddenPrevious().getText();
-        n = n.getPrevSibling();
-      }
-      return null;
+        if ((node.getHiddenPrevious() != null)
+                && (node.getHiddenPrevious().getType() == ProgressTokenTypes.ML__COMMENT)) {
+            return node.getHiddenPrevious().getText();
+        }
+        IASTNode n = node.getPrevSibling();
+        while ((n != null) && (n.getType() == ProgressParserTokenTypes.ANNOTATION)) {
+            if ((n.getHiddenPrevious() != null)
+                    && (n.getHiddenPrevious().getType() == ProgressTokenTypes.ML__COMMENT))
+                return n.getHiddenPrevious().getText();
+            n = n.getPrevSibling();
+        }
+        return null;
     }
 
 }

@@ -40,22 +40,6 @@ public class ProcedureDocumentationVisitor extends ASTVisitor {
         cu.toXML(out);
     }
 
-//    @Override
-//    public boolean visit(IStatement node) {
-//        if (node.getStatementType() == ProgressParserTokenTypes.FIND) {
-//            Statement smt = (Statement) node;
-//            for (IASTNode iter : smt.getChildren()) {
-//                for (IASTNode zz : iter.getChildren()) {
-//                    for (IASTNode zzz : zz.getChildren()) {
-//
-//                    }
-//
-//                }
-//            }
-//        }
-//        return super.visit(node);
-//    }
-
     @Override
     public boolean visit(ProcedureDeclaration decl) {
         if (decl == null)
@@ -92,16 +76,18 @@ public class ProcedureDocumentationVisitor extends ASTVisitor {
      * @return
      */
     public static String findPreviousComment(ASTNode node) {
-      if ((node.getHiddenPrevious() != null) && (node.getHiddenPrevious().getType() == ProgressTokenTypes.ML__COMMENT)) {
-        return node.getHiddenPrevious().getText();
-      }
-      IASTNode n = node.getPrevSibling();
-      while ((n != null) && (n.getType() == ProgressParserTokenTypes.ANNOTATION)) {
-        if ((n.getHiddenPrevious() != null) && (n.getHiddenPrevious().getType() == ProgressTokenTypes.ML__COMMENT))
-          return n.getHiddenPrevious().getText();
-        n = n.getPrevSibling();
-      }
-      return null;
+        if ((node.getHiddenPrevious() != null)
+                && (node.getHiddenPrevious().getType() == ProgressTokenTypes.ML__COMMENT)) {
+            return node.getHiddenPrevious().getText();
+        }
+        IASTNode n = node.getPrevSibling();
+        while ((n != null) && (n.getType() == ProgressParserTokenTypes.ANNOTATION)) {
+            if ((n.getHiddenPrevious() != null)
+                    && (n.getHiddenPrevious().getType() == ProgressTokenTypes.ML__COMMENT))
+                return n.getHiddenPrevious().getText();
+            n = n.getPrevSibling();
+        }
+        return null;
     }
 
 }
