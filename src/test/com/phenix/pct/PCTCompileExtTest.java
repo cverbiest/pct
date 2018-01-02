@@ -234,14 +234,18 @@ public class PCTCompileExtTest extends BuildFileTestNg {
     public void test16() {
         configureProject(BASEDIR + "test16/build.xml");
         executeTarget("xcode");
-        File f1 = new File(BASEDIR + "test16/src/xcode/test.p");
+        File f1 = new File(BASEDIR + "test16/src/xcode1/test.p");
         assertTrue(f1.exists());
-        executeTarget("test");
+        File f1bis = new File(BASEDIR + "test16/src/xcode2/test.p");
+        assertTrue(f1bis.exists());
 
-        File f2 = new File(BASEDIR + "test16/build/std/test.r");
+        executeTarget("test");
+        File f2 = new File(BASEDIR + "test16/build1/test.r");
         assertTrue(f2.exists());
-        File f3 = new File(BASEDIR + "test16/build/xcode/test.r");
+        File f3 = new File(BASEDIR + "test16/build2/test.r");
         assertTrue(f3.exists());
+        File f4 = new File(BASEDIR + "test16/build3/test.r");
+        assertTrue(f4.exists());
     }
 
     @Test(groups = {"v10"})
@@ -992,42 +996,56 @@ public class PCTCompileExtTest extends BuildFileTestNg {
         List<String> rexp = new ArrayList<>();
         rexp.add("PCTCompile - Progress Code Compiler");
         rexp.add("Error compiling file 'src/dir1/test1.p' \\.\\.\\.");
-        rexp.add(" \\.\\.\\. in main file.*");
+        rexp.add(" \\.\\.\\. in main file at line 3.*");
         expectLogRegexp("test1", rexp, false);
 
         rexp.clear();
         rexp.add("PCTCompile - Progress Code Compiler");
         rexp.add("Error compiling file 'src/dir1/test2.p' \\.\\.\\.");
-        rexp.add(" \\.\\.\\. in file 'src/dir1/test2.i' at line .*");
+        rexp.add(" \\.\\.\\. in file 'src/dir1/test2.i' at line 3.*");
         expectLogRegexp("test2", rexp, false);
 
         rexp.clear();
         rexp.add("PCTCompile - Progress Code Compiler");
         rexp.add("Error compiling file 'src/dir1/test3.p' \\.\\.\\.");
-        rexp.add(" \\.\\.\\. in file 'src/dir1/test2.i' at line .*");
+        rexp.add(" \\.\\.\\. in file 'src/dir1/test2.i' at line 3.*");
         rexp.add(".*");
         rexp.add(".*");
         rexp.add(".*");
         rexp.add(".*");
-        rexp.add(" \\.\\.\\. in main file.*");
+        rexp.add(" \\.\\.\\. in main file at line 4.*");
         expectLogRegexp("test3", rexp, false);
 
         rexp.clear();
         rexp.add("PCTCompile - Progress Code Compiler");
         rexp.add("Error compiling file 'src/dir1/test4.p' \\.\\.\\.");
-        rexp.add(" \\.\\.\\. in file 'src/rssw/pct/TestClass.cls' at line .*");
+        rexp.add(" \\.\\.\\. in file 'src/rssw/pct/TestClass.cls' at line 2.*");
         rexp.add(".*");
         rexp.add(".*");
         rexp.add(".*");
         rexp.add(".*");
-        rexp.add(" \\.\\.\\. in main file.*");
+        rexp.add(" \\.\\.\\. in main file at line 2.*");
         expectLogRegexp("test4", rexp, false);
 
         rexp.clear();
         rexp.add("PCTCompile - Progress Code Compiler");
         rexp.add("Error compiling file 'rssw/pct/TestClass2.cls' \\.\\.\\.");
-        rexp.add(" \\.\\.\\. in main file at line .*");
+        rexp.add(" \\.\\.\\. in main file at line 2.*");
         expectLogRegexp("test5", rexp, false);
+    }
+
+    @Test(groups = {"v10"})
+    public void test64() {
+        // Simplified version of test58
+        configureProject(BASEDIR + "test64/build.xml");
+        executeTarget("init");
+        executeTarget("build");
+        assertTrue(new File(BASEDIR + "test64/build1/file1.r").exists());
+        assertTrue(new File(BASEDIR + "test64/build2/file1.r").exists());
+        assertTrue(new File(BASEDIR + "test64/build1/.dbg/file1.p").exists());
+        assertTrue(new File(BASEDIR + "test64/build2/.dbg/file1.p").exists());
+        expectLog("test-fr-1", new String[] { "FR1-FR1", "7", "FR2-FR2", "7"});
+        expectLog("test-fr-2", new String[] { "FR1-FR1", "7", "FR2-FR2", "7"});
     }
 
     @Test(groups = {"v10"})
