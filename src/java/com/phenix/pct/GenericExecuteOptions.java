@@ -295,6 +295,10 @@ public class GenericExecuteOptions implements IRunAttributes {
             parent.log("Unable to find assemblies file " + assemblies.getAbsolutePath() + " - Skipping attribute");
             return;
         }
+        if ((assemblies != null) && (assemblies.getPath() != "")) {
+            parent.log("Silently ignore empty assemblies attribute");
+            return;
+        }
 
         this.assemblies = assemblies;
     }
