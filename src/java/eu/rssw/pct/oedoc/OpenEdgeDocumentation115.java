@@ -1,5 +1,5 @@
 /**
- * Copyright 2005-2017 Riverside Software
+ * Copyright 2005-2018 Riverside Software
  *
  *  Licensed under the Apache License, Version 2.0 (the "License");
  *  you may not use this file except in compliance with the License.
@@ -71,8 +71,6 @@ public class OpenEdgeDocumentation115 extends PCT {
 
     /**
      * Destination directory
-     * 
-     * @param destFile Directory
      */
     public void setDestDir(File dir) {
         this.destDir = dir;
@@ -122,6 +120,10 @@ public class OpenEdgeDocumentation115 extends PCT {
         if (this.destDir == null) {
             throw new BuildException(MessageFormat.format(Messages.getString("OpenEdgeClassDocumentation.0"), "destDir"));
         }
+        if (!createDir(destDir)) {
+            throw new BuildException("Unable to create destination directory");
+        }
+
         // There must be at least one fileset
         if (filesets.isEmpty()) {
             throw new BuildException(Messages.getString("OpenEdgeClassDocumentation.1"));

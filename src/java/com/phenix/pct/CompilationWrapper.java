@@ -1,5 +1,5 @@
 /**
- * Copyright 2005-2017 Riverside Software
+ * Copyright 2005-2018 Riverside Software
  *
  *  Licensed under the Apache License, Version 2.0 (the "License");
  *  you may not use this file except in compliance with the License.
@@ -22,6 +22,7 @@ import org.apache.tools.ant.BuildException;
 import org.apache.tools.ant.types.Mapper;
 import org.apache.tools.ant.types.Path;
 import org.apache.tools.ant.types.ResourceCollection;
+import org.apache.tools.ant.types.Environment.Variable;
 import org.apache.tools.ant.util.FileNameMapper;
 
 public class CompilationWrapper extends PCT implements IRunAttributes, ICompilationAttributes {
@@ -38,6 +39,7 @@ public class CompilationWrapper extends PCT implements IRunAttributes, ICompilat
     @Override
     public void execute() {
         PCT pctTask;
+        checkDlcHome();
         // Handle pct:compile_ext
         if ("pctcompileext".equalsIgnoreCase(getRuntimeConfigurableWrapper().getElementTag())
                 || "pct:compile_ext"
@@ -55,10 +57,11 @@ public class CompilationWrapper extends PCT implements IRunAttributes, ICompilat
             ((PCTCompile) pctTask).setRunAttributes(runAttributes);
             ((PCTCompile) pctTask).setCompilationAttributes(compAttributes);
         }
-        pctTask.bindToOwner(this);
-        if (getDlcHome() != null) {
-            pctTask.setDlcHome(getDlcHome());
+        for (Variable var : getEnvironmentVariables()) {
+            pctTask.addEnv(var);
         }
+        pctTask.bindToOwner(this);
+        pctTask.setDlcHome(getDlcHome());
         pctTask.setIncludedPL(getIncludedPL());
         pctTask.execute();
     }
@@ -196,6 +199,16 @@ public class CompilationWrapper extends PCT implements IRunAttributes, ICompilat
     }
 
     @Override
+    public void setUseRevvideo(boolean useRevvideo) {
+        compAttributes.setUseRevvideo(useRevvideo);
+    }
+
+    @Override
+    public void setUseUnderline(boolean useUnderline) {
+        compAttributes.setUseUnderline(useUnderline);
+    }
+
+    @Override
     public void setKeepXref(boolean keepXref) {
         compAttributes.setKeepXref(keepXref);
     }
@@ -230,9 +243,13 @@ public class CompilationWrapper extends PCT implements IRunAttributes, ICompilat
         compAttributes.setXCode(xcode);
     }
 
+    /**
+     * @deprecated
+     */
+    @Deprecated
     @Override
     public void setXCodeKey(String xcodeKey) {
-        compAttributes.setXCodeKey(xcodeKey);
+        setXCodeSessionKey(xcodeKey);
     }
 
     @Override
@@ -462,7 +479,7 @@ public class CompilationWrapper extends PCT implements IRunAttributes, ICompilat
     }
 
     @Override
-    public void setAssemblies(File assemblies) {
+    public void setAssemblies(String assemblies) {
         runAttributes.setAssemblies(assemblies);
     }
 
@@ -472,8 +489,8 @@ public class CompilationWrapper extends PCT implements IRunAttributes, ICompilat
     }
 
     @Override
-    public void setXCodeInit(boolean xcode) {
-        throw new BuildException("Can't set XCodeInit attribute here");
+    public void setXCodeSessionKey(String xCodeSessionKey) {
+        runAttributes.setXCodeSessionKey(xCodeSessionKey);
     }
 
     @Override

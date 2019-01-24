@@ -1,5 +1,5 @@
 /**
- * Copyright 2005-2017 Riverside Software
+ * Copyright 2005-2018 Riverside Software
  *
  *  Licensed under the Apache License, Version 2.0 (the "License");
  *  you may not use this file except in compliance with the License.
@@ -26,6 +26,11 @@ public class ProgressV10 implements ProgressProcedures {
     @Override
     public String getCompileProcedure() {
         return "pct/pctCompile.p";
+    }
+
+    @Override
+    public String getDynamicRunProcedure() {
+        throw new UnsupportedOperationException("No dynamic procedure on version 10");
     }
 
     @Override
@@ -56,11 +61,6 @@ public class ProgressV10 implements ProgressProcedures {
     @Override
     public String getLoadSingleTableDataProcedure() {
         return "pct/v10/loadData2.p";
-    }
-
-    @Override
-    public boolean needRedirector() {
-        return false;
     }
 
     @Override
@@ -136,6 +136,11 @@ public class ProgressV10 implements ProgressProcedures {
     @Override
     public String getCallbackString() {
         return "";
+    }
+
+    @Override
+    public String getXCodeSessionKey() {
+        return getString("ProgressV10.16"); //$NON-NLS-1$
     }
 
     public String getString(String key) {

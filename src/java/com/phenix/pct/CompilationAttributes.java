@@ -1,5 +1,5 @@
 /**
- * Copyright 2005-2017 Riverside Software
+ * Copyright 2005-2018 Riverside Software
  *
  *  Licensed under the Apache License, Version 2.0 (the "License");
  *  you may not use this file except in compliance with the License.
@@ -16,12 +16,16 @@
  */
 package com.phenix.pct;
 
+import java.io.BufferedWriter;
 import java.io.File;
+import java.io.FileOutputStream;
+import java.io.IOException;
+import java.io.OutputStreamWriter;
+import java.nio.charset.Charset;
 import java.util.ArrayList;
 import java.util.List;
 
 import org.apache.tools.ant.BuildException;
-import org.apache.tools.ant.Task;
 import org.apache.tools.ant.types.ResourceCollection;
 
 public class CompilationAttributes implements ICompilationAttributes {
@@ -44,6 +48,8 @@ public class CompilationAttributes implements ICompilationAttributes {
     private boolean multiCompile = false;
     private boolean streamIO = false;
     private boolean v6Frame = false;
+    private boolean useRevvideo = false;
+    private boolean useUnderline = false;
     private boolean stringXref = false;
     private boolean appendStringXref = false;
     private boolean saveR = true;
@@ -52,7 +58,6 @@ public class CompilationAttributes implements ICompilationAttributes {
     private boolean requireFullKeywords = false;
     private boolean requireFieldQualifiers = false;
     private boolean requireFullNames = false;
-    private String xcodeKey = null;
     private String languages = null;
     private int growthFactor = -1;
     private int progPerc = 0;
@@ -61,9 +66,9 @@ public class CompilationAttributes implements ICompilationAttributes {
     private int fileList = 0;
 
     // Internal use
-    private final Task parent;
+    private final PCT parent;
 
-    public CompilationAttributes(Task parent) {
+    public CompilationAttributes(PCT parent) {
         this.parent = parent;
     }
 
@@ -158,6 +163,16 @@ public class CompilationAttributes implements ICompilationAttributes {
     }
 
     @Override
+    public void setUseRevvideo(boolean useRevvideo) {
+        this.useRevvideo = useRevvideo;
+    }
+
+    @Override
+    public void setUseUnderline(boolean useUnderline) {
+        this.useUnderline = useUnderline;
+    }
+
+    @Override
     public void setKeepXref(boolean keepXref) {
         this.keepXref = keepXref;
     }
@@ -194,7 +209,7 @@ public class CompilationAttributes implements ICompilationAttributes {
 
     @Override
     public void setXCodeKey(String xcodeKey) {
-        this.xcodeKey = xcodeKey;
+        throw new UnsupportedOperationException("Not used anymore");
     }
 
     @Override
@@ -307,6 +322,14 @@ public class CompilationAttributes implements ICompilationAttributes {
         return v6Frame;
     }
 
+    public boolean isUseRevvideo() {
+        return useRevvideo;
+    }
+
+    public boolean isUseUnderline() {
+        return useUnderline;
+    }
+
     public boolean isStringXref() {
         return stringXref;
     }
@@ -337,10 +360,6 @@ public class CompilationAttributes implements ICompilationAttributes {
 
     public boolean isRequireFullNames() {
         return requireFullNames;
-    }
-
-    public String getXcodeKey() {
-        return xcodeKey;
     }
 
     public String getLanguages() {
@@ -382,4 +401,74 @@ public class CompilationAttributes implements ICompilationAttributes {
     public int getFileList() {
         return fileList;
     }
+
+    protected void writeCompilationProcedure(File f, Charset c) {
+        boolean bAbove1173 = parent.getVersion().compareTo(new DLCVersion(11, 7, "3")) >= 0;
+        try (FileOutputStream fos = new FileOutputStream(f);
+                OutputStreamWriter osw = new OutputStreamWriter(fos, c);
+                BufferedWriter bw = new BufferedWriter(osw)) {
+            bw.write("DEFINE INPUT PARAMETER ipSrcFile AS CHARACTER NO-UNDO.");
+            bw.newLine();
+            bw.write("DEFINE INPUT PARAMETER ipSaveDir AS CHARACTER NO-UNDO.");
+            bw.newLine();
+            bw.write("DEFINE INPUT PARAMETER ipDbg AS CHARACTER NO-UNDO.");
+            bw.newLine();
+            bw.write("DEFINE INPUT PARAMETER ipListing AS CHARACTER NO-UNDO.");
+            bw.newLine();
+            bw.write("DEFINE INPUT PARAMETER ipPreprocess AS CHARACTER NO-UNDO.");
+            bw.newLine();
+            bw.write("DEFINE INPUT PARAMETER ipStrXref AS CHARACTER NO-UNDO.");
+            bw.newLine();
+            bw.write("DEFINE INPUT PARAMETER ipXREF AS CHARACTER NO-UNDO.");
+            bw.newLine();
+            bw.write("DEFINE INPUT PARAMETER ipOptions AS CHARACTER NO-UNDO.");
+            bw.newLine();
+
+            bw.write("DO ON STOP UNDO, RETRY: IF RETRY THEN DO: COMPILER:ERROR = TRUE. RETURN. END.");
+            bw.newLine();
+            bw.write("COMPILE VALUE(ipSrcFile) ");
+            if (bAbove1173)
+                bw.write("OPTIONS ipOptions ");
+            if (isSaveR())
+                bw.write("SAVE INTO VALUE(ipSaveDir) ");
+            bw.write(" DEBUG-LIST VALUE(ipDbg) ");
+            if (getLanguages() != null) {
+                bw.write("LANGUAGES (\"" + getLanguages() + "\") ");
+                if (getGrowthFactor() > 0)
+                    bw.write("TEXT-SEG-GROWTH=" + getGrowthFactor() + " ");
+            }
+            if (isMd5())
+                bw.write("GENERATE-MD5 ");
+            if (isMinSize())
+                bw.write("MIN-SIZE ");
+            if (isStreamIO())
+                bw.write("STREAM-IO ");
+            if (isV6Frame()) {
+                bw.write("V6FRAME ");
+                if (isUseRevvideo())
+                    bw.write("USE-REVVIDEO ");
+                else if (isUseUnderline())
+                    bw.write("USE-UNDERLINE ");
+            }
+            if (!isXcode()) {
+                bw.write("LISTING VALUE(ipListing) ");
+                bw.write("PREPROCESS VALUE(ipPreprocess) ");
+                bw.write("STRING-XREF VALUE(ipStrXref) ");
+                if (isAppendStringXref())
+                    bw.write("APPEND ");
+                if (isXmlXref())
+                    bw.write("XREF-XML VALUE(ipXREF) ");
+                else
+                    bw.write("XREF VALUE(ipXREF) ");
+
+            }
+            bw.write("NO-ERROR.");
+            bw.newLine();
+            bw.write("END.");
+            bw.newLine();
+        } catch (IOException caught) {
+            throw new BuildException(Messages.getString("PCTCompile.2"), caught); //$NON-NLS-1$
+        }
+    }
+
 }

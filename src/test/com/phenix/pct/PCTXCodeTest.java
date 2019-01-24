@@ -1,5 +1,5 @@
 /**
- * Copyright 2005-2017 Riverside Software
+ * Copyright 2005-2018 Riverside Software
  *
  *  Licensed under the Apache License, Version 2.0 (the "License");
  *  you may not use this file except in compliance with the License.
@@ -35,6 +35,9 @@ public class PCTXCodeTest extends BuildFileTestNg {
         executeTarget("test");
 
         assertTrue(new File("PCTXCode/test1/src/xcode/dir1/test1.p").exists());
+        assertTrue(new File("PCTXCode/test1/src/xcode/test2.p").exists());
+        assertTrue(new File("PCTXCode/test1/src/xcode/dir1/dir2/test3.p").exists());
+        assertTrue(new File("PCTXCode/test1/src/xcode/test1.p").exists());
     }
 
 }

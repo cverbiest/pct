@@ -1,5 +1,5 @@
 /**
- * Copyright 2005-2017 Riverside Software
+ * Copyright 2005-2018 Riverside Software
  *
  *  Licensed under the Apache License, Version 2.0 (the "License");
  *  you may not use this file except in compliance with the License.
@@ -42,6 +42,7 @@ public class RCodeInfo {
     private boolean sixty_four_bits;
     private long crc;
     private String md5;
+    private long rCodeSize;
     private long timeStamp;
 
     private InputStream input;
@@ -99,6 +100,10 @@ public class RCodeInfo {
 
     public String getMD5() {
         return md5;
+    }
+
+    public long getRCodeSize() {
+        return rCodeSize;
     }
 
     public boolean is64bits() {
@@ -167,7 +172,7 @@ public class RCodeInfo {
         // expirationDate = readUnsignedInt(fc, 32, swapped);
         signatureSize = readUnsignedInt(fc, 56, swapped);
         // typeBlockSize = readUnsignedInt(fc, 60, swapped);
-        // rcodeSize = readUnsignedInt(fc, 64, swapped);
+        rCodeSize = readUnsignedInt(fc, 64, swapped);
         crc = readUnsignedShort(fc, HEADER_SIZE + segmentTableSize + signatureSize + 0xA4, swapped);
         md5 = bufferToHex(fc, HEADER_SIZE + segmentTableSize + (int) signatureSize + md5Offset, 16);
     }
@@ -177,6 +182,7 @@ public class RCodeInfo {
         signatureSize = readUnsignedShort(fc, 8, swapped);
         int md5Offset = readUnsignedShort(fc, 10, swapped);
         segmentTableSize = readUnsignedShort(fc, 30, swapped);
+        rCodeSize = readUnsignedInt(fc, 64, swapped);
         crc = readUnsignedShort(fc, HEADER_SIZE + segmentTableSize + (int) signatureSize + 0x6E,
                 swapped);
         md5 = bufferToHex(fc, HEADER_SIZE + segmentTableSize + (int) signatureSize + md5Offset, 16);
@@ -228,25 +234,12 @@ public class RCodeInfo {
         input.read(buf);
 
         StringBuffer hexString = new StringBuffer(2 * length);
-        for (int i = 0; i < length; i++)
-            appendHexPair(buf[i], hexString);
+        for (int i = 0; i < length; i++) {
+            hexString.append(String.format("%02X", buf[i]));
+        }
 
         return hexString.toString();
     }
-
-    private static void appendHexPair(byte b, StringBuffer hexString) {
-        char highNibble = kHexChars[(b & 0xF0) >> 4];
-        char lowNibble = kHexChars[b & 0x0F];
-
-        hexString.append(highNibble);
-        hexString.append(lowNibble);
-    }
-
-    /**
-     * @see http://www.bombaydigital.com/arenared/2004/2/12/1
-     */
-    private static final char kHexChars[] = {'0', '1', '2', '3', '4', '5', '6', '7', '8', '9', 'A',
-            'B', 'C', 'D', 'E', 'F'};
 
     public static class InvalidRCodeException extends Exception {
         private static final long serialVersionUID = 1L;

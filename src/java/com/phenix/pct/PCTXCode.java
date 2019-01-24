@@ -1,5 +1,5 @@
 /**
- * Copyright 2005-2017 Riverside Software
+ * Copyright 2005-2018 Riverside Software
  *
  *  Licensed under the Apache License, Version 2.0 (the "License");
  *  you may not use this file except in compliance with the License.
@@ -16,15 +16,18 @@
  */
 package com.phenix.pct;
 
+import java.io.BufferedWriter;
 import java.io.File;
+import java.io.FileWriter;
+import java.io.IOException;
 import java.text.MessageFormat;
 import java.util.ArrayList;
 import java.util.List;
 
 import org.apache.tools.ant.BuildException;
 import org.apache.tools.ant.Project;
+import org.apache.tools.ant.Task;
 import org.apache.tools.ant.taskdefs.ExecTask;
-import org.apache.tools.ant.types.Commandline;
 import org.apache.tools.ant.types.Environment;
 import org.apache.tools.ant.types.FileSet;
 
@@ -39,12 +42,10 @@ public class PCTXCode extends PCT {
     private File destDir = null;
     private int tmpLogId = -1;
     private File tmpLog = null;
+    private int filesListId = -1;
+    private File filesList = null;
     private boolean overwrite = false;
     private boolean lowercase = false;
-
-    // Internal use
-    private ExecTask exec = null;
-    private Commandline.Argument arg = null;
 
     /**
      * Default constructor
@@ -53,7 +54,9 @@ public class PCTXCode extends PCT {
         super();
 
         tmpLogId = PCT.nextRandomInt();
-        tmpLog = new File(System.getProperty("java.io.tmpdir"), "pct_outp" + tmpLogId + ".log"); //$NON-NLS-1$ //$NON-NLS-2$ //$NON-NLS-3$
+        tmpLog = new File(System.getProperty(PCT.TMPDIR), "pct_outp" + tmpLogId + ".log"); //$NON-NLS-1$ //$NON-NLS-2$ //$NON-NLS-3$
+        filesListId = PCT.nextRandomInt();
+        filesList = new File(System.getProperty(PCT.TMPDIR), "xcode" + filesListId + ".input"); //$NON-NLS-1$ //$NON-NLS-2$ //$NON-NLS-3$
     }
 
     /**
@@ -102,12 +105,34 @@ public class PCTXCode extends PCT {
     }
 
     /**
-     * Creates destination directories, according to source directory tree
+     * Do the work
      * 
      * @throws BuildException Something went wrong
      */
-    private void createDirectories() throws BuildException {
-        for (FileSet fs : filesets) {
+    @Override
+    public void execute() {
+        checkDlcHome();
+        if (destDir == null) {
+            cleanup();
+            throw new BuildException(Messages.getString("PCTXCode.4")); //$NON-NLS-1$
+        }
+
+        log(Messages.getString("PCTXCode.5"), Project.MSG_INFO); //$NON-NLS-1$
+
+        try {
+            for (FileSet fs : filesets) {
+                Task task = createExecTask(fs);
+                task.execute();
+            }
+            cleanup();
+        } catch (BuildException be) {
+            cleanup();
+            throw be;
+        }
+    }
+
+    private void createFileList(FileSet fs) {
+        try (FileWriter w = new FileWriter(filesList); BufferedWriter writer = new BufferedWriter(w)) {
             for (String str : fs.getDirectoryScanner(getProject()).getIncludedFiles()) {
                 int j = str.replace(File.separatorChar, '/').lastIndexOf('/');
 
@@ -119,58 +144,31 @@ public class PCTXCode extends PCT {
                                 Messages.getString("PCTXCode.3"), f2.getAbsolutePath())); //$NON-NLS-1$
                     }
                 }
-            }
-        }
-    }
 
-    /**
-     * Do the work
-     * 
-     * @throws BuildException Something went wrong
-     */
-    public void execute() throws BuildException {
-        checkDlcHome();
-        if (destDir == null) {
-            cleanup();
-            throw new BuildException(Messages.getString("PCTXCode.4")); //$NON-NLS-1$
-        }
+                File trgFile = new File(destDir, str);
+                File srcFile = new File(fs.getDir(getProject()), str);
 
-        log(Messages.getString("PCTXCode.5"), Project.MSG_INFO); //$NON-NLS-1$
+                if (!trgFile.exists() || overwrite
+                        || (srcFile.lastModified() > trgFile.lastModified())) {
+                    log(MessageFormat.format(
+                            Messages.getString("PCTXCode.6"), trgFile.toString()), Project.MSG_VERBOSE); //$NON-NLS-1$
+                    writer.write(str);
+                    writer.newLine();
 
-        try {
-            createDirectories();
-            createExecTask();
-
-            for (FileSet fs : filesets) {
-                exec.setDir(fs.getDir(getProject()));
-
-                for (String str : fs.getDirectoryScanner(getProject()).getIncludedFiles()) {
-                    File trgFile = new File(destDir, str);
-                    File srcFile = new File(fs.getDir(getProject()), str);
-
-                    if (!trgFile.exists() || overwrite
-                            || (srcFile.lastModified() > trgFile.lastModified())) {
-                        log(MessageFormat.format(
-                                Messages.getString("PCTXCode.6"), trgFile.toString()), Project.MSG_VERBOSE); //$NON-NLS-1$
-                        arg.setValue(str);
-                        if (overwrite) {
-                            if (!trgFile.delete())
-                                throw new BuildException(Messages.getString("PCTXCode.7"));
-                        }
-                        exec.execute();
+                    if (overwrite) {
+                        if (!trgFile.delete())
+                            throw new BuildException(Messages.getString("PCTXCode.7"));
                     }
                 }
             }
-            cleanup();
-        } catch (BuildException be) {
-            cleanup();
-            throw be;
+        } catch (IOException caught) {
+            throw new BuildException(caught);
         }
-
     }
 
-    private void createExecTask() {
-        exec = new ExecTask(this);
+    private Task createExecTask(FileSet fs) {
+        ExecTask exec = new ExecTask(this);
+        exec.setDir(fs.getDir(getProject()));
         exec.setOutput(tmpLog);
         exec.setExecutable(getExecPath("xcode").toString()); //$NON-NLS-1$
 
@@ -191,13 +189,16 @@ public class PCTXCode extends PCT {
             exec.createArg().setValue("-l"); //$NON-NLS-1$
         }
 
-        arg = exec.createArg();
+        exec.createArg().setValue("-");
+
+        createFileList(fs);
+        exec.setInput(filesList);
+
+        return exec;
     }
 
     protected void cleanup() {
-        if (tmpLog.exists() && !tmpLog.delete()) {
-            log(MessageFormat.format(
-                    Messages.getString("PCTXCode.13"), tmpLog.getAbsolutePath()), Project.MSG_VERBOSE); //$NON-NLS-1$
-        }
+        deleteFile(tmpLog);
+        deleteFile(filesList);
     }
 }

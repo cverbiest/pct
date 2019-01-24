@@ -1,5 +1,5 @@
 /**
- * Copyright 2005-2017 Riverside Software
+ * Copyright 2005-2018 Riverside Software
  *
  *  Licensed under the Apache License, Version 2.0 (the "License");
  *  you may not use this file except in compliance with the License.
@@ -46,14 +46,15 @@ public class OpenEdgeHTMLDocumentation extends PCTRun {
     private boolean treeViewOverview = true;
     private boolean preloadClasses = true;
 
+    // Internal use
+    private boolean tempTmplDir = false;
+
     public OpenEdgeHTMLDocumentation() {
         super();
     }
 
     /**
      * Destination directory
-     * 
-     * @param destFile Directory
      */
     public void setDestDir(File dir) {
         this.destDir = dir;
@@ -97,6 +98,9 @@ public class OpenEdgeHTMLDocumentation extends PCTRun {
             throw new BuildException(MessageFormat.format(
                     Messages.getString("OpenEdgeClassDocumentation.0"), "destDir"));
         }
+        if (!createDir(destDir)) {
+            throw new BuildException("Unable to create destination directory");
+        }
         // And source directory too
         if (sourceDir == null) {
             throw new BuildException(MessageFormat.format(
@@ -105,8 +109,9 @@ public class OpenEdgeHTMLDocumentation extends PCTRun {
         // Template directory is optional. If not set, then extract the template directory from
         // PCT.jar
         if (templateDir == null) {
+            tempTmplDir = true;
             int tempDirNum = PCT.nextRandomInt();
-            templateDir = new File(System.getProperty("java.io.tmpdir"), "Templates" + tempDirNum); //$NON-NLS-1$ //$NON-NLS-2$
+            templateDir = new File(System.getProperty(PCT.TMPDIR), "Templates" + tempDirNum); //$NON-NLS-1$ //$NON-NLS-2$
             templateDir.mkdirs();
             new File(destDir, "resources").mkdir();
             try {
@@ -159,5 +164,15 @@ public class OpenEdgeHTMLDocumentation extends PCTRun {
                 }
             }
         }
+    }
+
+    @Override
+    protected void cleanup() {
+        super.cleanup();
+
+        if (getDebugPCT())
+            return;
+        if (tempTmplDir)
+            deleteFile(templateDir);
     }
 }

@@ -1,5 +1,5 @@
 /**
- * Copyright 2005-2017 Riverside Software
+ * Copyright 2005-2018 Riverside Software
  *
  *  Licensed under the Apache License, Version 2.0 (the "License");
  *  you may not use this file except in compliance with the License.
@@ -96,7 +96,7 @@ INPUT STREAM sFileset CLOSE.
 MESSAGE STRING(iCompOK) + " file(s) compiled".
 IF (iCompFail GE 1) THEN
   MESSAGE "Failed to compile " iCompFail " file(s)".
-RETURN (IF (iCompFail GT 0) AND failOnErr THEN '10' ELSE '0').
+RETURN (IF iCompFail GT 0 THEN '10' ELSE '0').
 
 PROCEDURE logError.
   DEFINE INPUT PARAMETER ipMsg AS CHARACTER NO-UNDO.

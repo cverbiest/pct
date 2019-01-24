@@ -1,5 +1,5 @@
 /**
- * Copyright 2005-2017 Riverside Software
+ * Copyright 2005-2018 Riverside Software
  *
  *  Licensed under the Apache License, Version 2.0 (the "License");
  *  you may not use this file except in compliance with the License.
@@ -204,4 +204,17 @@ public class PCTCreateBaseTest extends BuildFileTestNg {
         File f4 = new File("PCTCreateBase/test17/build2/test.r");
         assertTrue(f4.exists());
     }
+
+    @Test(groups= {"unix", "v10"})
+    public void test18() {
+        configureProject("PCTCreateBase/test18/build.xml");
+        executeTarget("init");
+        expectBuildException("db1", "Temp dir not writable");
+        executeTarget("db2");
+        executeTarget("test");
+        File f = new File("PCTCreateBase/test18/build/test.r");
+        assertTrue(f.exists());
+    }
+
+
 }

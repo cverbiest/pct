@@ -1,5 +1,5 @@
 /**
- * Copyright 2005-2017 Riverside Software
+ * Copyright 2005-2018 Riverside Software
  *
  *  Licensed under the Apache License, Version 2.0 (the "License");
  *  you may not use this file except in compliance with the License.
@@ -63,8 +63,6 @@ public class ABLUnit extends PCTRun {
 
     /**
      * Set the path of the results file.
-     * 
-     * @param location
      */
     public void setDestDir(File destDir) {
         this.destDir = destDir;
@@ -90,8 +88,6 @@ public class ABLUnit extends PCTRun {
 
     /**
      * Select case(s).
-     * 
-     * @param cases
      */
     public void setTestCase(String testCase) {
         this.testCase = testCase.split(",");
@@ -215,10 +211,8 @@ public class ABLUnit extends PCTRun {
     protected void cleanup() {
         super.cleanup();
 
-        // Clean JSON File
-        if (!getDebugPCT() && json.exists() && !json.delete()) {
-            log(MessageFormat.format(Messages.getString("PCTRun.5"), json.getAbsolutePath()),
-                    Project.MSG_INFO);
-        }
+        if (getDebugPCT())
+            return;
+        deleteFile(json);
     }
 }
