@@ -37,13 +37,22 @@ public class PCTBinaryLoad extends PCT {
     private List<FileSet> filesets = new ArrayList<>();
     private int indexRebuildTimeout = 0;
     private boolean rebuildIndexes = true;
+    private File paramFile = null;
+
+    public void addDB_Connection(PCTConnection dbConn) {
+        addDBConnection(dbConn);
+    }
+
+    public void addPCTConnection(PCTConnection dbConn) {
+        addDBConnection(dbConn);
+    }
 
     /**
      * Adds a database connection
-     * 
+     *
      * @param dbConn Instance of DBConnection class
      */
-    public void addPCTConnection(PCTConnection dbConn) {
+    public void addDBConnection(PCTConnection dbConn) {
         if (this.dbConnList == null) {
             this.dbConnList = new ArrayList<>();
         }
@@ -71,6 +80,15 @@ public class PCTBinaryLoad extends PCT {
         }
 
         this.indexRebuildTimeout = timeout;
+    }
+
+    /**
+     * Parameter file (-pf attribute)
+     *
+     * @param pf File
+     */
+    public void setParamFile(File pf) {
+        this.paramFile = pf;
     }
 
     /**
@@ -110,6 +128,7 @@ public class PCTBinaryLoad extends PCT {
 
     private ExecTask loadTask(File binaryFile) {
         ExecTask exec = new ExecTask(this);
+        exec.setFailonerror(true);
         File a = getExecPath("_proutil"); //$NON-NLS-1$
         exec.setExecutable(a.toString());
 
@@ -131,6 +150,10 @@ public class PCTBinaryLoad extends PCT {
             exec.createArg().setValue("indexes"); //$NON-NLS-1$
             exec.createArg().setValue("-G"); //$NON-NLS-1$
             exec.createArg().setValue(Integer.toString(indexRebuildTimeout));
+        }
+        if (this.paramFile != null) {
+            exec.createArg().setValue("-pf"); //$NON-NLS-1$
+            exec.createArg().setValue(this.paramFile.getAbsolutePath());
         }
 
         return exec;

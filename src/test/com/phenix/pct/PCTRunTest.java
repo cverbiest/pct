@@ -302,7 +302,7 @@ public class PCTRunTest extends BuildFileTestNg {
     @Test(groups = {"v10"})
     public void test37() {
         configureProject("PCTRun/test37/build.xml");
-        expectLog("test1", "Result : 789");
+        expectLog("test1", "Result : 123");
         expectLog("test2", "Result : 1");
         expectLog("test3", "Result : 1");
     }
@@ -407,5 +407,13 @@ public class PCTRunTest extends BuildFileTestNg {
         configureProject("PCTRun/test48/build.xml");
         executeTarget("test1");
         expectBuildException("test2", "Invalid env variable");
+    }
+
+    @Test(groups = {"v10"})
+    public void test49() {
+        configureProject("PCTRun/test49/build.xml");
+        executeTarget("test");
+        File f = new File("PCTRun/test49/profiler");
+        assertEquals(f.listFiles().length, 1);
     }
 }

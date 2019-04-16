@@ -41,6 +41,8 @@ public class CompilationAttributes implements ICompilationAttributes {
     private boolean runList = false;
     private boolean listing = false;
     private String listingSource = null;
+    private int pageSize = -1;
+    private int pageWidth = -1;
     private boolean preprocess = false;
     private boolean debugListing = false;
     private boolean keepXref = false;
@@ -64,6 +66,7 @@ public class CompilationAttributes implements ICompilationAttributes {
     private boolean flattenDbg = true;
     private String ignoredIncludes = null;
     private int fileList = 0;
+    private String callback = null;
 
     // Internal use
     private final PCT parent;
@@ -108,6 +111,16 @@ public class CompilationAttributes implements ICompilationAttributes {
             this.listingSource = source;
         else
             throw new BuildException("Invalid listingSource attribute : " + source);
+    }
+
+    @Override
+    public void setPageSize(int pageSize) {
+        this.pageSize = pageSize;
+    }
+
+    @Override
+    public void setPageWidth(int pageWidth) {
+        this.pageWidth = pageWidth;
     }
 
     @Override
@@ -262,6 +275,11 @@ public class CompilationAttributes implements ICompilationAttributes {
         this.fileList = display;
     }
 
+    @Override
+    public void setCallbackClass(String callback) {
+        this.callback = callback;
+    }
+
     public List<ResourceCollection> getResources() {
         return resources;
     }
@@ -292,6 +310,14 @@ public class CompilationAttributes implements ICompilationAttributes {
 
     public String getListingSource() {
         return listingSource;
+    }
+
+    public int getPageSize() {
+        return pageSize;
+    }
+
+    public int getPageWidth() {
+        return pageWidth;
     }
 
     public boolean isPreprocess() {
@@ -402,6 +428,10 @@ public class CompilationAttributes implements ICompilationAttributes {
         return fileList;
     }
 
+    public String getCallbackClass() {
+        return callback;
+    }
+
     protected void writeCompilationProcedure(File f, Charset c) {
         boolean bAbove1173 = parent.getVersion().compareTo(new DLCVersion(11, 7, "3")) >= 0;
         try (FileOutputStream fos = new FileOutputStream(f);
@@ -452,6 +482,10 @@ public class CompilationAttributes implements ICompilationAttributes {
             }
             if (!isXcode()) {
                 bw.write("LISTING VALUE(ipListing) ");
+                if (getPageSize() != -1)
+                    bw.write("PAGE-SIZE " + getPageSize() + " ");
+                if (getPageWidth() != -1)
+                    bw.write("PAGE-WIDTH " + getPageWidth() + " ");
                 bw.write("PREPROCESS VALUE(ipPreprocess) ");
                 bw.write("STRING-XREF VALUE(ipStrXref) ");
                 if (isAppendStringXref())

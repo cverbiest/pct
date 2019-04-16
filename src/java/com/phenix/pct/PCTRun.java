@@ -411,6 +411,13 @@ public class PCTRun extends PCT implements IRunAttributes {
                 throw new BuildException("Unable to extract pct.pl.");
             }
 
+            // OE12 ? Define failOnError and resultProperty
+            if (getDLCMajorVersion() >= 12) {
+                exec.setFailonerror(runAttributes.isFailOnError());
+                if (runAttributes.getResultProperty() != null)
+                    exec.setResultProperty(runAttributes.getResultProperty());
+            }
+
             exec.execute();
         } catch (BuildException be) {
             cleanup();
@@ -436,6 +443,11 @@ public class PCTRun extends PCT implements IRunAttributes {
                     throw new BuildException(ioe);
                 }
             }
+        }
+
+        if (getDLCMajorVersion() >= 12) {
+            cleanup();
+            return;
         }
 
         // Now read status file

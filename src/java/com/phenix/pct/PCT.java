@@ -104,7 +104,9 @@ public abstract class PCT extends Task {
             throw new BuildException(caught);
         }
 
-        if (version.compareTo(new DLCVersion(11, 7, "0")) >= 0)
+        if (version.compareTo(new DLCVersion(12, 0, "0")) >= 0)
+            this.pp = new ProgressV12();
+        else if (version.compareTo(new DLCVersion(11, 7, "0")) >= 0)
             this.pp = new ProgressV117();
         else if (version.compareTo(new DLCVersion(11, 4, "0")) >= 0)
             this.pp = new ProgressV114();
@@ -163,7 +165,6 @@ public abstract class PCT extends Task {
     /**
      * Add default pct.pl included in JAR file into PROPATH. Default value is true.
      * 
-     * @param inc
      * @since 0.10
      */
     public final void setIncludedPL(boolean inc) {
@@ -432,7 +433,6 @@ public abstract class PCT extends Task {
      * 
      * @param f File or directory (must not be present)
      * @return Boolean
-     * @throws IOException
      * @since PCT 0.10
      */
     protected boolean extractPL(File f) throws IOException {

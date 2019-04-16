@@ -140,6 +140,15 @@ public class PCTBgCompile extends PCTBgRun {
             getOptions().setXCodeSessionKey(null);
         }
 
+        // Verify resource collections
+        for (ResourceCollection rc : compAttrs.getResources()) {
+            if (!rc.isFilesystemOnly()) {
+                cleanup();
+                throw new BuildException(
+                        "PCTCompile only supports file-system resources collections");
+            }
+        }
+
         initializeCompilationUnits();
         compAttrs.writeCompilationProcedure(new File(compDir, "pctcomp.p"), getCharset());
         getOptions().addPropath(new Path(getProject(), compDir.getAbsolutePath()));
@@ -327,6 +336,7 @@ public class PCTBgCompile extends PCTBgRun {
             sb.append(Boolean.toString(compAttrs.isRequireFullKeywords())).append(';');
             sb.append(Boolean.toString(compAttrs.isRequireFullNames())).append(';');
             sb.append(Boolean.toString(compAttrs.isRequireFieldQualifiers())).append(';');
+            sb.append(compAttrs.getCallbackClass() == null ? "" : compAttrs.getCallbackClass()).append(';');
 
             return sb.toString();
         }
