@@ -31,7 +31,7 @@ import java.util.Map;
 
 /**
  * Object to add a database connection to a PCTRun task
- * 
+ *
  * @author <a href="mailto:g.querret+PCT@gmail.com">Gilles QUERRET </a>
  */
 public class PCTConnection extends DataType {
@@ -48,12 +48,13 @@ public class PCTConnection extends DataType {
     private File dbDir = null;
     private File paramFile = null;
     private Boolean singleUser = null;
+    private Boolean useSingleUserFallback = null;
     private Boolean readOnly = null;
     private Map<String, PCTAlias> aliases = null;
 
     /**
      * Database physical name (<CODE>-db</CODE> parameter)
-     * 
+     *
      * @param dbName String
      */
     public void setDbName(String dbName) {
@@ -64,7 +65,7 @@ public class PCTConnection extends DataType {
 
     /**
      * Database directory
-     * 
+     *
      * @param dbDir File
      */
     public void setDbDir(File dbDir) {
@@ -75,7 +76,7 @@ public class PCTConnection extends DataType {
 
     /**
      * Port name or number (<CODE>-S</CODE> parameter)
-     * 
+     *
      * @param dbPort String
      */
     public void setDbPort(String dbPort) {
@@ -84,7 +85,7 @@ public class PCTConnection extends DataType {
 
     /**
      * Protocol to use (<CODE>-N</CODE> parameter)
-     * 
+     *
      * @param protocol "AS400SNA|TCP"
      */
     public void setProtocol(String protocol) {
@@ -93,7 +94,7 @@ public class PCTConnection extends DataType {
 
     /**
      * Logical name to use (<CODE>-ld</CODE> parameter)
-     * 
+     *
      * @param logicalName String
      */
     public void setLogicalName(String logicalName) {
@@ -102,7 +103,7 @@ public class PCTConnection extends DataType {
 
     /**
      * Name of the schema cache file (<CODE>-cache</CODE> parameter)
-     * 
+     *
      * @param cacheFile File
      */
     public void setCacheFile(File cacheFile) {
@@ -111,7 +112,7 @@ public class PCTConnection extends DataType {
 
     /**
      * Name of the nameserver to connect to a dataserver (<CODE>-DataService</CODE> parameter)
-     * 
+     *
      * @param dataService String
      */
     public void setDataService(String dataService) {
@@ -120,7 +121,7 @@ public class PCTConnection extends DataType {
 
     /**
      * Database type (ORACLE, SQLSERVER or nothing) (<CODE>-dt</CODE> parameter)
-     * 
+     *
      * @param dbType String
      */
     public void setDbType(String dbType) {
@@ -129,7 +130,7 @@ public class PCTConnection extends DataType {
 
     /**
      * Host where to access database (<CODE>-H</CODE> parameter)
-     * 
+     *
      * @param hostName String
      */
     public void setHostName(String hostName) {
@@ -138,7 +139,7 @@ public class PCTConnection extends DataType {
 
     /**
      * Username needed to access database (<CODE>-U</CODE> parameter)
-     * 
+     *
      * @param userName String
      */
     public void setUserName(String userName) {
@@ -147,7 +148,7 @@ public class PCTConnection extends DataType {
 
     /**
      * Password needed to access database (<CODE>-P</CODE> parameter)
-     * 
+     *
      * @param password String
      */
     public void setPassword(String password) {
@@ -156,7 +157,7 @@ public class PCTConnection extends DataType {
 
     /**
      * Parameter file (-pf attribute)
-     * 
+     *
      * @param paramFile File
      */
     public void setParamFile(File paramFile) {
@@ -165,7 +166,7 @@ public class PCTConnection extends DataType {
 
     /**
      * If true, opens the database in read-only mode
-     * 
+     *
      * @param readOnly true|false|on|off|yes|no
      */
     public void setReadOnly(boolean readOnly) {
@@ -174,7 +175,7 @@ public class PCTConnection extends DataType {
 
     /**
      * If true, opens the database in single-user mode
-     * 
+     *
      * @param singleUser true|false|on|off|yes|no
      */
     public void setSingleUser(boolean singleUser) {
@@ -182,13 +183,22 @@ public class PCTConnection extends DataType {
     }
 
     /**
+     * If true, attempts single-user connection if multi user fails
+     *
+     * @param singleUser true|false|on|off|yes|no
+     */
+    public void setUseSingleUserFallback(boolean useSingleUserFallback) {
+        this.useSingleUserFallback = useSingleUserFallback;
+    }
+
+    /**
      * Adds an alias to the current DB connection.
-     * 
+     *
      * The previous method's name (addPCTAlias) was changed when I switched from Vector to HashMap
      * as a container for PCTAlias. When using addPCTAlias, you enter the method with a newly
      * created object but with undefined attributes. If your method is called addConfigured then the
      * object's attribute are set. See http://ant.apache.org/manual/develop.html#nested-elements
-     * 
+     *
      * @param alias Instance of PCTAlias
      */
     public void addConfiguredPCTAlias(PCTAlias alias) {
@@ -211,7 +221,7 @@ public class PCTConnection extends DataType {
 
     /**
      * Checks if aliases defined
-     * 
+     *
      * @return True if aliases defined for this database connection
      */
     public boolean hasAliases() {
@@ -221,7 +231,7 @@ public class PCTConnection extends DataType {
 
     /**
      * Checks if an alias is defined
-     * 
+     *
      * @param aliasName String
      * @return True if alias defined for this database connection
      */
@@ -232,7 +242,7 @@ public class PCTConnection extends DataType {
 
     /**
      * Returns an ordered list of connection parameters
-     * 
+     *
      * @return List of String
      * @throws BuildException Something went wrong (dbName or paramFile not defined)
      */
@@ -259,14 +269,16 @@ public class PCTConnection extends DataType {
             list.add(paramFile.getAbsolutePath());
         }
 
-        if (protocol != null) {
-            list.add("-N"); //$NON-NLS-1$
-            list.add(protocol);
-        }
+        if (singleUser != true) {
+            if (protocol != null) {
+                list.add("-N"); //$NON-NLS-1$
+                list.add(protocol);
+            }
 
-        if (dbPort != null) {
-            list.add("-S"); //$NON-NLS-1$
-            list.add(dbPort);
+            if (dbPort != null) {
+                list.add("-S"); //$NON-NLS-1$
+                list.add(dbPort);
+            }
         }
 
         if (logicalName != null) {
@@ -276,13 +288,13 @@ public class PCTConnection extends DataType {
 
         if (singleUser != null) {
             if (singleUser) {
-                list.add("-1"); //$NON-NLS-1$    
+                list.add("-1"); //$NON-NLS-1$
             }
             else {
                 list.remove("-1");
          }
         }
-       
+
 
         if (cacheFile != null) {
             list.add("-cache"); //$NON-NLS-1$
@@ -299,9 +311,11 @@ public class PCTConnection extends DataType {
             list.add(dbType);
         }
 
-        if (hostName != null) {
-            list.add("-H"); //$NON-NLS-1$
-            list.add(hostName);
+        if (singleUser != true) {
+            if (hostName != null) {
+                list.add("-H"); //$NON-NLS-1$
+                list.add(hostName);
+            }
         }
 
         if (readOnly != null ) {
@@ -327,10 +341,11 @@ public class PCTConnection extends DataType {
         return list;
 
     }
+
     /**
      * Returns a string which could be used by a CONNECT statement or directly in a _progres or
      * prowin32 command line
-     * 
+     *
      * @return Connection string
      * @throws BuildException If DB name or parameter file not defined
      */
@@ -344,10 +359,35 @@ public class PCTConnection extends DataType {
     }
 
     /**
+     * Returns a string which could be used by a CONNECT statement or directly in a _progres or
+     * prowin32 command line
+     *
+     * @return Connection string
+     * @throws BuildException If DB name or parameter file not defined
+     */
+    public String createRetryConnectString() {
+        StringBuilder sb = new StringBuilder();
+
+        if ((singleUser == null) || (!singleUser)) {
+
+            if (useSingleUserFallback) {
+                boolean oldValue = singleUser;
+                singleUser = true;
+                for (String str : getConnectParametersList()) {
+                    String s = PCTRun.escapeString(str);
+                    sb.append((s.indexOf(' ') == -1 ? s : "'" + s + "'")).append(' '); //$NON-NLS-1$ //$NON-NLS-2$
+                }
+                singleUser = oldValue;
+            }
+        }
+        return sb.toString();
+    }
+
+    /**
      * Returns a string which could be used to connect a database from a background worker Pipe
      * separated list, first entry is connection string, followed by aliases. Aliases are comma
      * separated list, first entry is alias name, second is 1 if NO-ERROR, 0 w/o no-error
-     * 
+     *
      * @return Connection string
      * @throws BuildException
      */
@@ -365,7 +405,7 @@ public class PCTConnection extends DataType {
 
     /**
      * Populates a command line with the needed arguments to connect to the specified database
-     * 
+     *
      * @param task Exec task to populate
      * @throws BuildException Something went wrong
      */
@@ -377,7 +417,7 @@ public class PCTConnection extends DataType {
 
     /**
      * Returns defined aliases for a database connection
-     * 
+     *
      * @return Collection
      */
     public Collection<PCTAlias> getAliases() {
@@ -398,7 +438,7 @@ public class PCTConnection extends DataType {
 
     /**
      * Returns database name
-     * 
+     *
      * @return String
      */
     public String getDbName() {

@@ -44,12 +44,12 @@ import org.apache.tools.ant.util.FileUtils;
 
 /**
  * Run a Progress procedure.
- * 
+ *
  * @author <a href="mailto:g.querret+PCT@gmail.com">Gilles QUERRET </a>
  */
 public class PCTRun extends PCT implements IRunAttributes {
     protected GenericExecuteOptions runAttributes;
-    
+
     protected Path internalPropath = null;
 
     // Internal use
@@ -70,7 +70,7 @@ public class PCTRun extends PCT implements IRunAttributes {
 
     /**
      * Default constructor
-     * 
+     *
      */
     public PCTRun() {
         this(true);
@@ -78,7 +78,7 @@ public class PCTRun extends PCT implements IRunAttributes {
 
     /**
      * Default constructor
-     * 
+     *
      * @param tmp True if temporary files need to be created
      */
     public PCTRun(boolean tmp) {
@@ -98,7 +98,7 @@ public class PCTRun extends PCT implements IRunAttributes {
             profilerParamFile = new File(
                     System.getProperty(PCT.TMPDIR), "prof" + profilerID + ".pf"); //$NON-NLS-1$ //$NON-NLS-2$ //$NON-NLS-3$
             // XCode temp directory
-            xcodeDir = new File(System.getProperty(PCT.TMPDIR), "xcode" + xcodeID); 
+            xcodeDir = new File(System.getProperty(PCT.TMPDIR), "xcode" + xcodeID);
         }
     }
 
@@ -208,7 +208,7 @@ public class PCTRun extends PCT implements IRunAttributes {
     public void setDebugPCT(boolean debugPCT) {
         runAttributes.setDebugPCT(debugPCT);
     }
-    
+
     @Override
     public void setCompileUnderscore(boolean compUnderscore) {
         runAttributes.setCompileUnderscore(compUnderscore);
@@ -374,7 +374,7 @@ public class PCTRun extends PCT implements IRunAttributes {
 
     /**
      * Do the work
-     * 
+     *
      * @throws BuildException Something went wrong
      */
     @Override
@@ -615,7 +615,7 @@ public class PCTRun extends PCT implements IRunAttributes {
                     bw.write("-FILENAME " + runAttributes.getProfiler().getOutputFile().getAbsolutePath());
                     bw.newLine();
                 } else {
-                    // Assuming nobody will use file names with double quotes in this case... 
+                    // Assuming nobody will use file names with double quotes in this case...
                     bw.write("-FILENAME \""
                             + new File(runAttributes.getProfiler().getOutputDir(), "profiler" + profilerOutID
                                     + ".out\""));
@@ -659,8 +659,9 @@ public class PCTRun extends PCT implements IRunAttributes {
             int dbNum = 1;
             for (PCTConnection dbc : runAttributes.getAllDbConnections()) {
                 String connect = dbc.createConnectString();
+                String singleuserretryconnect = dbc.createRetryConnectString();
                 bw.write(MessageFormat.format(this.getProgressProcedures().getConnectString(),
-                        connect));
+                        connect, singleuserretryconnect));
 
                 Collection<PCTAlias> aliases = dbc.getAliases();
                 if (aliases != null) {
@@ -709,7 +710,7 @@ public class PCTRun extends PCT implements IRunAttributes {
                                             + File.pathSeparatorChar));
                         } catch (Exception caught) {
                             throw new IOException(caught);
-                        } 
+                        }
                     } else {
                         bw.write(MessageFormat.format(this.getProgressProcedures()
                                 .getPropathString(), escapeString(lst[k]) + File.pathSeparatorChar));
@@ -807,7 +808,7 @@ public class PCTRun extends PCT implements IRunAttributes {
 
     /**
      * Escapes a string so it does not accidentally contain Progress escape characters
-     * 
+     *
      * @param str the input string
      * @return the escaped string
      */
@@ -842,7 +843,7 @@ public class PCTRun extends PCT implements IRunAttributes {
 
     /**
      * Return PCT Debug status
-     * 
+     *
      * @return boolean
      */
     protected boolean getDebugPCT() {
