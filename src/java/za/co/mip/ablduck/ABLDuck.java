@@ -1,5 +1,5 @@
 /**
- * Copyright 2017-2018 MIP Holdings
+ * Copyright 2017-2020 MIP Holdings
  *
  *  Licensed under the Apache License, Version 2.0 (the "License");
  *  you may not use this file except in compliance with the License.
@@ -18,14 +18,19 @@ package za.co.mip.ablduck;
 
 import java.io.BufferedOutputStream;
 import java.io.File;
+import java.io.FileInputStream;
 import java.io.FileOutputStream;
 import java.io.FileWriter;
 import java.io.IOException;
 import java.io.InputStream;
+import java.io.InputStreamReader;
+import java.io.OutputStreamWriter;
+import java.io.Reader;
 import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Paths;
+import java.nio.file.StandardCopyOption;
 import java.text.Format;
 import java.text.MessageFormat;
 import java.text.SimpleDateFormat;
@@ -34,6 +39,7 @@ import java.util.Arrays;
 import java.util.Collections;
 import java.util.Date;
 import java.util.HashMap;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.regex.Matcher;
@@ -89,6 +95,10 @@ public class ABLDuck extends PCT {
     private Boolean dataFilesOnly = false;
     private List<FileSet> filesets = new ArrayList<>();
     protected Path propath = null;
+    private String encoding = null;
+    private Charset inputCharset = null;
+    private File template = null;
+    private File customLink = null;
 
     public ABLDuck() {
         super();
@@ -122,6 +132,15 @@ public class ABLDuck extends PCT {
     }
 
     /**
+     * Codepage to use when reading files
+     * 
+     * @param encoding String
+     */
+    public void setEncoding(String encoding) {
+        this.encoding = encoding;
+    }
+
+    /**
      * Set the propath to be used when running the procedure
      * 
      * @param propath an Ant Path object containing the propath
@@ -152,9 +171,26 @@ public class ABLDuck extends PCT {
         this.dataFilesOnly = dataOnly;
     }
 
+    /**
+     * Set the template directory or zip (if null, we use default template)
+     * 
+     * @param template directory of template file
+     */
+    public void setTemplate(File template) {
+        this.template = template;
+    }
+
+    /**
+     * Set a customLink File
+     * 
+     * @param customLink customLinkFile
+     */
+    public void setCustomLink(File customLink) {
+        this.customLink = customLink;
+    }
+
     @Override
     public void execute() {
-        checkDlcHome();
 
         // Destination directory must exist
         if (this.destDir == null) {
@@ -171,7 +207,20 @@ public class ABLDuck extends PCT {
         if (!this.dataFilesOnly) {
             // Extract template
             try {
-                extractTemplateDirectory(this.destDir);
+                if (template != null && this.template.isDirectory()) {
+                    copyFullRecursive(this.template, this.destDir);
+                } else if (this.template != null && this.template.isFile()) {
+                    unzip(new FileInputStream(this.template), this.destDir);
+                } else {
+                    extractTemplateDirectory(this.destDir);
+                }
+
+                // CustomLinkFile
+                String vCustomLink = "resources/customlink.js";
+                if (this.customLink != null && this.customLink.isFile()) {
+                    vCustomLink = this.customLink.getName();
+                    copyFullRecursive(this.customLink, new File(this.destDir, vCustomLink));
+                }
 
                 Format formatter = new SimpleDateFormat("EEE d MMM yyyy HH:mm:ss");
                 List<String> files = Arrays.asList("index.html"); // , "template.html",
@@ -183,6 +232,8 @@ public class ABLDuck extends PCT {
                     replaceTemplateTags("{version}", Version.getPCTVersion(),
                             Paths.get(this.destDir.getAbsolutePath(), file));
                     replaceTemplateTags("{date}", formatter.format(new Date()),
+                            Paths.get(this.destDir.getAbsolutePath(), file));
+                    replaceTemplateTags("{customLinkFile}", vCustomLink,
                             Paths.get(this.destDir.getAbsolutePath(), file));
                 }
             } catch (IOException ex) {
@@ -213,25 +264,30 @@ public class ABLDuck extends PCT {
                 String ext = file.getName().substring(extPos);
                 boolean isClass = ".cls".equalsIgnoreCase(ext);
 
-                ICompilationUnit root = astMgr.createAST(file, astContext, monitor,
-                        IASTManager.EXPAND_ON, IASTManager.DLEVEL_FULL);
-                if (isClass) {
-                    ABLDuckClassVisitor visitor = new ABLDuckClassVisitor(pp);
-                    log("Executing AST ClassVisitor " + file.getAbsolutePath(),
-                            Project.MSG_VERBOSE);
-                    root.accept(visitor);
+                try (InputStream input = new FileInputStream(file);
+                        Reader fsr = new InputStreamReader(input, getCharset())) {
+                    ICompilationUnit root = astMgr.createAST(fsr, astContext, monitor,
+                            IASTManager.EXPAND_ON, IASTManager.DLEVEL_FULL);
+                    if (isClass) {
+                        ABLDuckClassVisitor visitor = new ABLDuckClassVisitor(pp);
+                        log("Executing AST ClassVisitor " + file.getAbsolutePath(),
+                                Project.MSG_VERBOSE);
+                        root.accept(visitor);
 
-                    CompilationUnit cu = visitor.getCompilationUnit();
-                    classes.put(cu.name, cu);
-                } else {
+                        CompilationUnit cu = visitor.getCompilationUnit();
+                        classes.put(cu.name, cu);
+                    } else {
 
-                    ABLDuckProcedureVisitor visitor = new ABLDuckProcedureVisitor(dsfiles[i]);
-                    log("Executing AST ProcedureVisitor " + file.getAbsolutePath(),
-                            Project.MSG_VERBOSE);
-                    root.accept(visitor);
+                        ABLDuckProcedureVisitor visitor = new ABLDuckProcedureVisitor(dsfiles[i]);
+                        log("Executing AST ProcedureVisitor " + file.getAbsolutePath(),
+                                Project.MSG_VERBOSE);
+                        root.accept(visitor);
 
-                    CompilationUnit cu = visitor.getCompilationUnit();
-                    procedures.put(cu.name, cu);
+                        CompilationUnit cu = visitor.getCompilationUnit();
+                        procedures.put(cu.name, cu);
+                    }
+                } catch (IOException e) {
+                    log(e.getMessage(), Project.MSG_WARN);
                 }
             }
         }
@@ -275,7 +331,11 @@ public class ABLDuck extends PCT {
 
             Cls cls = new Cls();
             cls.name = cu.name;
-            cls.inherits = cu.inherits;
+            // Set FullName for inherts classes
+            cls.inherits = determineFullyQualifiedClassName(cu.uses, cu.inherits);
+            if (!cu.inherits.equals(cls.inherits)) {
+                cu.inherits = cls.inherits;
+            }
             cls.icon = ICON_PREFIX + cu.icon;
 
             data.classes.add(cls);
@@ -290,12 +350,27 @@ public class ABLDuck extends PCT {
 
             // Add implementers to the interface
             if (cu.implementations != null && !cu.implementations.isEmpty()) {
-                for (String i : cu.implementations) {
-                    String fullInterfacePath = determineFullyQualifiedClassName(cu.uses, i);
+                // TempList to avoid conflict
+                List<String> listNewImplement = new ArrayList<>();
+                Iterator<String> iter = cu.implementations.iterator();
+
+                while (iter.hasNext()) {
+                    String currentImplement = iter.next();
+                    String fullInterfacePath = determineFullyQualifiedClassName(cu.uses,
+                            currentImplement);
                     CompilationUnit iface = classes.get(fullInterfacePath);
                     if (iface != null) {
                         iface.implementers.add(cu.name);
+                        // Set FullName for implemented interfaces
+                        if (!currentImplement.equals(fullInterfacePath)) {
+                            iter.remove();
+                            listNewImplement.add(iface.name);
+                        }
                     }
+                }
+                // Adding the Full implement name
+                if (!listNewImplement.isEmpty()) {
+                    cu.implementations.addAll(listNewImplement);
                 }
             }
 
@@ -342,7 +417,8 @@ public class ABLDuck extends PCT {
             }
 
             File outputFile = new File(baseDir, cu.name + ".js");
-            try (FileWriter file = new FileWriter(outputFile.toString())) {
+            try (OutputStreamWriter file = new OutputStreamWriter(
+                    new FileOutputStream(outputFile.toString()), StandardCharsets.UTF_8)) {
                 file.write("Ext.data.JsonP." + cu.name.replace(".", "_") + "(" + gson.toJson(cu)
                         + ");");
             } catch (IOException ex) {
@@ -362,7 +438,8 @@ public class ABLDuck extends PCT {
 
             String filename = cu.name.replace(".", "_").replace("/", "_");
             File outputFile = new File(baseDir, filename + ".js");
-            try (FileWriter file = new FileWriter(outputFile.toString())) {
+            try (OutputStreamWriter file = new OutputStreamWriter(
+                    new FileOutputStream(outputFile.toString()), StandardCharsets.UTF_8)) {
                 file.write("Ext.data.JsonP." + filename + "(" + gson.toJson(cu) + ");");
             } catch (IOException ex) {
                 throw new BuildException(ex);
@@ -406,6 +483,21 @@ public class ABLDuck extends PCT {
             }
         }
         return result;
+    }
+
+    private void copyFullRecursive(File src, File dest) throws IOException {
+        if (src.isDirectory()) {
+            if (!dest.exists()) {
+                dest.mkdirs();
+            }
+
+            File[] list = src.listFiles();
+            for (File fic : list) {
+                copyFullRecursive(fic, new File(dest, fic.getName()));
+            }
+        } else {
+            Files.copy(src.toPath(), dest.toPath(), StandardCopyOption.REPLACE_EXISTING);
+        }
     }
 
     private void extractTemplateDirectory(File outputDir) throws IOException {
@@ -502,13 +594,30 @@ public class ABLDuck extends PCT {
                     + member.name;
             search.icon = ICON_PREFIX + member.tagname;
             search.url = "#!/" + cu.tagname + "/"
-                    + ("procedure".equals(cu.tagname) ? cu.name : member.owner) + "-" + member.tagname
-                    + "-" + member.name;
+                    + ("procedure".equals(cu.tagname) ? cu.name : member.owner) + "-"
+                    + member.tagname + "-" + member.name;
             search.sort = 3;
             search.meta = member.meta;
 
             data.search.add(search);
         }
+    }
+
+    /**
+     * Get the Charset from encoding parameter
+     * 
+     * @return Charset
+     */
+    protected Charset getCharset() {
+        if (inputCharset == null) {
+            try {
+                inputCharset = Charset.forName(this.encoding);
+            } catch (IllegalArgumentException caught) {
+                inputCharset = Charset.defaultCharset();
+            }
+        }
+
+        return inputCharset;
     }
 
 }

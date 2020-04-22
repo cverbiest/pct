@@ -1,5 +1,5 @@
 /**
- * Copyright 2005-2018 Riverside Software
+ * Copyright 2005-2020 Riverside Software
  *
  *  Licensed under the Apache License, Version 2.0 (the "License");
  *  you may not use this file except in compliance with the License.
@@ -198,6 +198,8 @@ public interface ICompilationAttributes {
 
     void setRequireFullNames(boolean requireFullNames);
 
+    void setRequireReturnValues(boolean requireReturnValues);
+
     /**
      * Adds a ResourceCollection to compile
      */
@@ -224,4 +226,11 @@ public interface ICompilationAttributes {
      * @param callback ABL Class
      */
     void setCallbackClass(String callback);
+
+    /**
+     * json value will display the errors and warnings in json format
+     *
+     * @param outputType String
+     */
+    void setOutputType(String outputType);
 }

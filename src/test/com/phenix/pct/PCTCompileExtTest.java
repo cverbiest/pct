@@ -1,5 +1,5 @@
 /**
- * Copyright 2005-2018 Riverside Software
+ * Copyright 2005-2020 Riverside Software
  *
  *  Licensed under the Apache License, Version 2.0 (the "License");
  *  you may not use this file except in compliance with the License.
@@ -906,6 +906,14 @@ public class PCTCompileExtTest extends BuildFileTestNg {
         executeTarget("test3");
         assertFalse(new File(BASEDIR + "test55/build3/.pct").exists());
         assertTrue(new File(BASEDIR + "test55/xref3/test.p.inc").exists());
+        assertTrue(new File(BASEDIR + "test55/build3/test.r").exists());
+        assertTrue(new File(BASEDIR + "test55/build3/test2.r").exists());
+
+        executeTarget("test4");
+        assertTrue(new File(BASEDIR + "test55/src/test.p").exists());
+        assertTrue(new File(BASEDIR + "test55/src/subdir/test2.p").exists());
+        assertTrue(new File(BASEDIR + "test55/src/test.r").exists());
+        assertTrue(new File(BASEDIR + "test55/src/test2.r").exists());
     }
 
     @Test(groups = {"v10"})
@@ -979,8 +987,12 @@ public class PCTCompileExtTest extends BuildFileTestNg {
         assertTrue(warns2.length() > 0);
         assertTrue(warns2.length() < warns1.length());
         File warns3 = new File(BASEDIR + "test62/build3/.pct/test.p.warnings");
-        assertTrue(warns3.exists());
-        assertEquals(warns3.length(), 0);
+        // All warnings are ignored, file is not present anymore
+        assertFalse(warns3.exists());
+
+        // Existing file should then be deleted
+        executeTarget("test2");
+        assertFalse(warns2.exists());
     }
 
     @Test(groups = {"v10"})
@@ -1239,6 +1251,71 @@ public class PCTCompileExtTest extends BuildFileTestNg {
         } catch (IOException e) {
             Assert.fail("Unable to read file", e);
         }
+    }
+
+    @Test(groups = {"v10"})
+    public void test79() {
+        // No test case as 'outputType' attribute is not implemented in PCTCompileExt
+    }
+
+    @Test(groups = {"v12"})
+    public void test80() {
+        // Only work with 12.2+
+        try {
+            DLCVersion version = DLCVersion.getObject(new File(System.getProperty("DLC")));
+            if ((version.getMajorVersion() == 12) && (version.getMinorVersion() <= 2))
+                return;
+        } catch (IOException caught) {
+            return;
+        } catch (InvalidRCodeException caught) {
+            return;
+        }
+
+        configureProject(BASEDIR + "test80/build.xml");
+        executeTarget("test1");
+        File f1 = new File(BASEDIR + "test80/build1/test.r");
+        assertTrue(f1.exists());
+
+        executeTarget("test2");
+        File f2 = new File(BASEDIR + "test80/build2/test.r");
+        assertTrue(f2.exists());
+        File f3 = new File(BASEDIR + "test80/build2/.pct/test.p.warnings");
+        assertTrue(f3.exists());
+    }
+
+    // @Test(groups = {"v11"})
+    public void test81() {
+        configureProject(BASEDIR + "test81/build.xml");
+        executeTarget("init");
+
+        executeTarget("test1");
+        File f1 = new File(BASEDIR + "test81/build1/rssw/Class1.r");
+        assertTrue(f1.exists());
+        File f2 = new File(BASEDIR + "test81/build1/prgs/Internal.r");
+        assertTrue(f2.exists());
+
+        executeTarget("test2");
+        File f3 = new File(BASEDIR + "test81/build2/rssw/Class1.r");
+        assertTrue(f3.exists());
+        File f4 = new File(BASEDIR + "test81/build2/prgs/Internal.r");
+        assertTrue(f4.exists());
+
+        executeTarget("test3");
+        File f5 = new File(BASEDIR + "test81/build3/rssw/Class1.r");
+        assertTrue(f5.exists());
+        File f6 = new File(BASEDIR + "test81/build3/prgs/Internal.r");
+        assertTrue(f6.exists());
+    }
+
+    @Test(groups = {"v11", "win"})
+    public void test82() {
+        configureProject(BASEDIR + "test82/build.xml");
+        expectBuildException("test", "Crashed process should lead to build failure");
+    }
+
+    @Test(groups = {"v10"})
+    public void test83() {
+        // No test case as 'outputType' attribute is not implemented in PCTCompileExt
     }
 
     @Test(groups = {"v10"})

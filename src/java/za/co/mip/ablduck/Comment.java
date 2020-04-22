@@ -1,5 +1,5 @@
 /**
- * Copyright 2017-2018 MIP Holdings
+ * Copyright 2017-2020 MIP Holdings
  *
  *  Licensed under the Apache License, Version 2.0 (the "License");
  *  you may not use this file except in compliance with the License.
@@ -28,8 +28,6 @@ import org.commonmark.renderer.html.HtmlRenderer;
 import za.co.mip.ablduck.models.Deprecated;
 
 public class Comment {
-    private static final String NEWLINE_SEPARATOR = System.getProperty("line.separator");
-
     private String comment = "";
     private String author = "";
     private String returns = "";
@@ -61,6 +59,12 @@ public class Comment {
         return parameters;
     }
 
+    public void addExtraTag(Map<String, String> extraTag) {
+        for (Map.Entry<String, String> vTag : extraTag.entrySet()) {
+            this.comment += "### " + vTag.getKey() + ":\n" + vTag.getValue() + "\n";
+        }
+    }
+
     public void parseComment(String comment) {
         if (comment == null || "".equals(comment))
             return;
@@ -73,14 +77,19 @@ public class Comment {
     }
 
     private void parseABLDocComment(String comment) {
-        String[] commentLines = comment.split(NEWLINE_SEPARATOR);
+        // convert crlf to lf to avoid eol problems
+        comment = comment.replace("\r\n", "\n");
+        
+        // Remove comment characters
+        comment = cleanAblComment(comment);
+        
+        String[] commentLines = comment.split("\n");
 
         String tagType = null;
         String tagText = null;
         List<Tag> resolvedTags = new ArrayList<>();
 
-        // Assuming the first and last lines are /* */
-        for (int i = 1; i < commentLines.length - 1; i++) {
+        for (int i = 0; i < commentLines.length; i++) {
 
             String commentLine = ltrim(commentLines[i]) + '\n'; // Put this back as we split on it
 
@@ -123,7 +132,10 @@ public class Comment {
                     continue;
                 }
             }
-            tagText += " " + commentLine;
+            if (tagType != null)
+                tagText += " " + commentLine;
+            else
+                this.comment += commentLine;
 
         }
 
@@ -134,9 +146,12 @@ public class Comment {
         for (Tag tag : resolvedTags) {
             switch (tag.getType().toLowerCase().trim()) {
                 case "param" :
-                    Integer nextSpace = tag.getText().indexOf(' ');
-                    this.parameters.put(tag.getText().substring(0, nextSpace),
-                            tag.getText().substring(nextSpace + 1));
+                    int nextSpace = tag.getText().indexOf(' ');
+                    if (nextSpace == -1)
+                        parameters.put(tag.getText(), "");
+                    else
+                        parameters.put(tag.getText().substring(0, nextSpace),
+                                tag.getText().substring(nextSpace + 1));
                     break;
                 case "return" :
                     this.returns = tag.getText();
@@ -145,8 +160,19 @@ public class Comment {
                 case "author(s)" :
                     this.author = tag.getText();
                     break;
+                case "deprecated" :
+                    nextSpace = tag.getText().indexOf(' ');
+                    if (nextSpace == -1)
+                        deprecated = new Deprecated(tag.getText(), "");
+                    else
+                        deprecated = new Deprecated(tag.getText().substring(0, nextSpace),
+                                tag.getText().substring(nextSpace + 1));
+                    break;
+                case "internal" :
+                    this.isInternal = true;
+                    break;
                 default :
-                    if (!"".equals(tag.getText()))
+                    if (!"".equals(tag.getText().trim().replace("\n", "")))
                         this.comment += "### " + tag.getType() + ":\n" + tag.getText() + "\n";
                     break;
             }
@@ -154,7 +180,10 @@ public class Comment {
     }
 
     private void parseJavadocComment(String comment) {
-        String[] commentLines = comment.split(NEWLINE_SEPARATOR);
+        // convert crlf to lf to avoid eol problems
+        comment = comment.replace("\r\n", "\n");
+
+        String[] commentLines = comment.split("\n");
 
         String tagType = null;
         String tagText = null;
@@ -202,18 +231,24 @@ public class Comment {
         if (tagType != null)
             resolvedTags.add(new Tag(tagType, tagText));
 
-        Integer nextSpace;
+        int nextSpace;
         for (Tag tag : resolvedTags) {
             switch (tag.getType().trim()) {
                 case "param" :
                     nextSpace = tag.getText().indexOf(' ');
-                    this.parameters.put(tag.getText().substring(0, nextSpace),
-                            tag.getText().substring(nextSpace + 1));
+                    if (nextSpace == -1)
+                        parameters.put(tag.getText(), "");
+                    else
+                        parameters.put(tag.getText().substring(0, nextSpace),
+                                tag.getText().substring(nextSpace + 1));
                     break;
                 case "deprecated" :
                     nextSpace = tag.getText().indexOf(' ');
-                    this.deprecated = new Deprecated(tag.getText().substring(0, nextSpace),
-                            tag.getText().substring(nextSpace + 1));
+                    if (nextSpace == -1)
+                        deprecated = new Deprecated(tag.getText(), "");
+                    else
+                        deprecated = new Deprecated(tag.getText().substring(0, nextSpace),
+                                tag.getText().substring(nextSpace + 1));
                     break;
                 case "return" :
                     this.returns = tag.getText();
@@ -226,6 +261,41 @@ public class Comment {
                     break;
             }
         }
+    }
+    public String ltrim(String s, Character pChar) {
+        int i = 0;
+        while (i < s.length() && s.charAt(i) == pChar) {
+            i++;
+        }
+        return s.substring(i);
+    }
+
+    public String rtrim(String s, Character pChar) {
+        int i = s.length() - 1;
+        while (i >= 0 && s.charAt(i) == pChar) {
+            i--;
+        }
+        return s.substring(0, i + 1);
+    }
+
+    /**
+     * Remove ABL comment characters
+     * 
+     * @param comment
+     * @return
+     */
+    private String cleanAblComment(String comment) {
+        /* Left */
+        comment = ltrim(comment, '/');
+        comment = ltrim(comment, '*');
+        comment = ltrim(comment, '-');
+        /* Right */
+        comment = rtrim(comment, '\n');
+        comment = rtrim(comment, '/');
+        comment = rtrim(comment, '*');
+        comment = rtrim(comment, '-');
+
+        return comment;
     }
 
     private String ltrim(String s) {
@@ -252,8 +322,9 @@ public class Comment {
         private String text;
 
         public Tag(String type, String text) {
+            // Trim the lasts lf char or lf space lf group
             this.type = type;
-            this.text = text;
+            this.text = cleanText(text);
         }
 
         public String getType() {
@@ -262,6 +333,17 @@ public class Comment {
 
         public String getText() {
             return this.text;
+        }
+
+        /**
+         * Remove useless EOL and Whitespaces
+         */
+        private String cleanText(String pText) {
+            int i = pText.length() - 1;
+            while (i >= 0 && (Character.isWhitespace(pText.charAt(i)) || pText.charAt(i) == '\n')) {
+                i--;
+            }
+            return pText.substring(0, i + 1);
         }
     }
 }

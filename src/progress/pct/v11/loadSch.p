@@ -1,5 +1,5 @@
 /**
- * Copyright 2005-2018 Riverside Software
+ * Copyright 2005-2019 Riverside Software
  *
  *  Licensed under the Apache License, Version 2.0 (the "License");
  *  you may not use this file except in compliance with the License.
@@ -32,7 +32,7 @@ DEFINE VARIABLE cFile       AS CHARACTER NO-UNDO.
 DEFINE VARIABLE callbackCls AS CHARACTER NO-UNDO.
 define variable analyzerCls as character no-undo.
 DEFINE VARIABLE callback    AS rssw.pct.ILoadCallback NO-UNDO.
-define variable analyzer    as OpenEdge.DataAdmin.Binding.IDataDefinitionLoader.
+define variable analyzer    as OpenEdge.DataAdmin.Binding.IDataDefinitionLoader NO-UNDO.
 DEFINE VARIABLE logger      AS rssw.pct.LoadLogger  NO-UNDO.
 DEFINE VARIABLE dictOpts    AS rssw.pct.LoadOptions NO-UNDO.
 DEFINE VARIABLE dictOpts2   AS OpenEdge.DataAdmin.Binding.DataDefinitionOptions NO-UNDO.

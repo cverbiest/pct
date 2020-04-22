@@ -1,5 +1,4 @@
 <?xml version="1.0" encoding="utf-8"?>
-
 <project name="PCT-Tests" xmlns:jacoco="antlib:org.jacoco.ant">
 
   <!-- Default values when using command line -->
@@ -7,6 +6,10 @@
   <property name="DLC" value="${env.DLC}" />
   <property name="PROFILER" value="false" />
   <property name="TESTLIBS" value="${basedir}/lib" />
+
+  <!-- Only used for OE version number -->
+  <taskdef resource="PCT.properties" />
+  <ProgressVersion dlcHome="${DLC}" majorVersion="OE_MAJOR_VERSION" minorVersion="OE_MINOR_VERSION" bitness="OE_ARCH" />
 
   <!-- Assume version 11 when in local development -->
   <condition property="GROUPS" value="v10,v11">
@@ -46,13 +49,14 @@
     <pathelement location="build/test" />
     <fileset dir="dist" includes="PCT.jar" />
     <fileset dir="lib" includes="*.jar" />
+    <fileset dir="${ant.library.dir}" includes="ant.jar,ant-launcher.jar" />
   </path>
 
   <path id="testng.cp">
     <fileset dir="lib" includes="testng-6.13.1.jar,jcommander-1.30.jar" />
   </path>
   <path id="jacoco.cp">
-    <fileset dir="lib" includes="jacocoant.jar" />
+    <fileset dir="lib" includes="jacocoant-0.8.4.jar" />
   </path>
 
   <target name="init">
@@ -64,6 +68,8 @@
     <!-- Only in testXX, test cases with number greater than 100 are reserved for PCTCompileExt -->
     <replace dir="testbox/PCTCompileExt" includes="test??/build.xml" token="PCTCompile" value="PCTCompileExt" />
     <replace dir="testbox/PCTCompileExt" includes="test??/build.xml" token="pct:compile" value="pct:compile_ext" />
+    <echo message="Using Ant '${ant.version}' in '${ant.home}'" />
+    <echo message="Using Java ${ant.java.version} - Java home: ${java.home}" />
   </target>
 
   <target name="test">

@@ -1,5 +1,5 @@
 /**
- * Copyright 2005-2018 Riverside Software
+ * Copyright 2005-2020 Riverside Software
  *
  *  Licensed under the Apache License, Version 2.0 (the "License");
  *  you may not use this file except in compliance with the License.
@@ -296,6 +296,11 @@ public class CompilationWrapper extends PCT implements IRunAttributes, ICompilat
     }
 
     @Override
+    public void setRequireReturnValues(boolean requireReturnValues) {
+        compAttributes.setRequireReturnValues(requireReturnValues);
+    }
+
+    @Override
     public void setStopOnError(boolean stopOnError) {
         compAttributes.setStopOnError(stopOnError);
     }
@@ -318,6 +323,11 @@ public class CompilationWrapper extends PCT implements IRunAttributes, ICompilat
     @Override
     public void setCallbackClass(String callback) {
         compAttributes.setCallbackClass(callback);
+    }
+
+    @Override
+    public void setOutputType(String outputType) {
+        compAttributes.setOutputType(outputType);
     }
 
     // End of ICompilationAttributes methods
@@ -509,6 +519,11 @@ public class CompilationWrapper extends PCT implements IRunAttributes, ICompilat
     @Override
     public void setXCodeSessionKey(String xCodeSessionKey) {
         runAttributes.setXCodeSessionKey(xCodeSessionKey);
+    }
+
+    @Override
+    public void setClientMode(String clientMode) {
+        throw new BuildException("Can't set clientMode attribute in compilation task");
     }
 
     @Override

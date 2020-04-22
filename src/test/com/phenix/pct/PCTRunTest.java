@@ -1,5 +1,5 @@
 /**
- * Copyright 2005-2018 Riverside Software
+ * Copyright 2005-2020 Riverside Software
  *
  *  Licensed under the Apache License, Version 2.0 (the "License");
  *  you may not use this file except in compliance with the License.
@@ -416,4 +416,33 @@ public class PCTRunTest extends BuildFileTestNg {
         File f = new File("PCTRun/test49/profiler");
         assertEquals(f.listFiles().length, 1);
     }
+
+    @Test(groups = {"v10"})
+    public void test50() {
+        configureProject("PCTRun/test50/build.xml");
+        executeTarget("init");
+
+        executeTarget("testrr1");
+        expectBuildException("testrr2", "Runtime client");
+        expectBuildException("testrr3", "Runtime client");
+
+        executeTarget("testrx1");
+        executeTarget("testrx2");
+        expectBuildException("testrr3", "Encrypted compiler client");
+
+        executeTarget("testrg1");
+        executeTarget("testrg2");
+        executeTarget("testrg3");
+    }
+
+    @Test(groups = {"v10"})
+    public void test51() {
+        configureProject("PCTRun/test51/build.xml");
+        executeTarget("test");
+        File f = new File("PCTRun/test51/profiler dir/");
+        assertEquals(f.listFiles().length, 1);
+        executeTarget("test2");
+        assertEquals(f.listFiles().length, 2);
+    }
+
 }

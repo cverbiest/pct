@@ -1,5 +1,5 @@
 /**
- * Copyright 2005-2018 Riverside Software
+ * Copyright 2005-2020 Riverside Software
  *
  *  Licensed under the Apache License, Version 2.0 (the "License");
  *  you may not use this file except in compliance with the License.
@@ -38,6 +38,7 @@ public class PCTBinaryLoad extends PCT {
     private int indexRebuildTimeout = 0;
     private boolean rebuildIndexes = true;
     private File paramFile = null;
+    private List<PCTRunOption> options = null;
 
     public void addDB_Connection(PCTConnection dbConn) {
         addDBConnection(dbConn);
@@ -100,6 +101,13 @@ public class PCTBinaryLoad extends PCT {
         this.rebuildIndexes = rebuildIndexes;
     }
 
+    public void addOption(PCTRunOption option) {
+        if (options == null) {
+            options = new ArrayList<>();
+        }
+        options.add(option);
+    }
+
     /**
      * Do the work
      * 
@@ -154,6 +162,17 @@ public class PCTBinaryLoad extends PCT {
         if (this.paramFile != null) {
             exec.createArg().setValue("-pf"); //$NON-NLS-1$
             exec.createArg().setValue(this.paramFile.getAbsolutePath());
+        }
+
+        if (options != null) {
+            for (PCTRunOption opt : options) {
+                if (opt.getName() == null) {
+                    throw new BuildException("PCTRun.8"); //$NON-NLS-1$
+                }
+                exec.createArg().setValue(opt.getName());
+                if (opt.getValue() != null)
+                    exec.createArg().setValue(opt.getValue());
+            }
         }
 
         return exec;

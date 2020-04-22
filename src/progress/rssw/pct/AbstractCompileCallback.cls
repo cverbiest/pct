@@ -1,5 +1,5 @@
 /**
- * Copyright 2005-2018 Riverside Software
+ * Copyright 2005-2019 Riverside Software
  *
  *  Licensed under the Apache License, Version 2.0 (the "License");
  *  you may not use this file except in compliance with the License.
@@ -16,7 +16,16 @@
  */
 
 CLASS rssw.pct.AbstractCompileCallback IMPLEMENTS rssw.pct.ICompileCallback ABSTRACT:
-    METHOD PUBLIC VOID initialize(hSrcProc AS HANDLE): END METHOD.
-    METHOD PUBLIC rssw.pct.CompileCallbackAction beforeCompile(hSrcProc AS HANDLE, ipInFile AS CHARACTER, ipInDir AS CHARACTER): END METHOD.
-    METHOD PUBLIC VOID afterCompile(hSrcProc AS HANDLE, ipInFile AS CHARACTER, ipInDir AS CHARACTER): END METHOD.
+  METHOD PUBLIC VOID initialize(hSrcProc AS HANDLE):
+    // No-op
+  END METHOD.
+
+  METHOD PUBLIC INTEGER beforeCompile(hSrcProc AS HANDLE, ipInFile AS CHARACTER, ipInDir AS CHARACTER):
+    RETURN 0.
+  END METHOD.
+
+  METHOD PUBLIC VOID afterCompile(hSrcProc AS HANDLE, ipInFile AS CHARACTER, ipInDir AS CHARACTER):
+    // No-op
+  END METHOD.
+
 END CLASS.

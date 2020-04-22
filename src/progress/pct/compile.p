@@ -1,5 +1,5 @@
 /**
- * Copyright 2005-2018 Riverside Software
+ * Copyright 2005-2019 Riverside Software
  *
  *  Licensed under the Apache License, Version 2.0 (the "License");
  *  you may not use this file except in compliance with the License.
@@ -19,6 +19,7 @@
  &IF DECIMAL(SUBSTRING(PROVERSION, 1, INDEX(PROVERSION, '.') + 1)) GE 11.3 &THEN
  USING Progress.Lang.Class.
  &ENDIF
+ USING Progress.Json.ObjectModel.*.
 
 &IF INTEGER(SUBSTRING(PROVERSION, 1, INDEX(PROVERSION, '.'))) GE 11 &THEN
   { pct/v11/xrefd0004.i}
@@ -68,6 +69,21 @@ DEFINE TEMP-TABLE ttErrors NO-UNDO
   INDEX ttErrors-PK IS PRIMARY UNIQUE intNum
   INDEX ttErrors-PK2 IS UNIQUE fileName rowNum colNum.
 
+DEFINE TEMP-TABLE ttProjectWarnings NO-UNDO
+  FIELD msgNum   AS INTEGER
+  FIELD rowNum   AS INTEGER
+  FIELD fileName AS CHARACTER
+  FIELD mainFileName AS CHARACTER
+  FIELD msg      AS CHARACTER.
+DEFINE TEMP-TABLE ttProjectErrors NO-UNDO
+  FIELD fileName AS CHARACTER
+  FIELD mainFileName AS CHARACTER
+  FIELD rowNum   AS INTEGER
+  FIELD colNum   AS INTEGER
+  FIELD msg      AS CHARACTER.
+
+DEFINE DATASET dsResult FOR ttProjectErrors, ttProjectWarnings.
+
 DEFINE SHARED VARIABLE pctVerbose AS LOGICAL NO-UNDO.
 
 FUNCTION getTimeStampDF RETURN DATETIME (INPUT d AS CHARACTER, INPUT f AS CHARACTER) FORWARD.
@@ -109,6 +125,7 @@ DEFINE VARIABLE ProgPerc  AS INTEGER    NO-UNDO INITIAL 0.
 DEFINE VARIABLE lOptFullKw AS LOGICAL   NO-UNDO INITIAL FALSE.
 DEFINE VARIABLE lOptFldQlf AS LOGICAL   NO-UNDO INITIAL FALSE.
 DEFINE VARIABLE lOptFullNames AS LOGICAL NO-UNDO INITIAL FALSE.
+DEFINE VARIABLE lOptRetVals AS LOGICAL  NO-UNDO INITIAL FALSE.
 DEFINE VARIABLE cOpts     AS CHARACTER NO-UNDO.
 DEFINE VARIABLE iLine     AS INTEGER    NO-UNDO.
 DEFINE VARIABLE iTotlines AS INTEGER    NO-UNDO.
@@ -120,6 +137,10 @@ DEFINE VARIABLE cIgnoredIncludes AS CHARACTER  NO-UNDO.
 DEFINE VARIABLE lIgnoredIncludes AS LOGICAL    NO-UNDO.
 DEFINE VARIABLE iFileList AS INTEGER    NO-UNDO.
 DEFINE VARIABLE callbackClass AS CHARACTER NO-UNDO.
+DEFINE VARIABLE outputType AS CHARACTER NO-UNDO.
+
+DEFINE VARIABLE lOutputJson    AS LOGICAL NO-UNDO INITIAL FALSE.
+DEFINE VARIABLE lOutputConsole AS LOGICAL NO-UNDO INITIAL FALSE.
 
 /* Handle to calling procedure in order to log messages */
 DEFINE VARIABLE hSrcProc AS HANDLE NO-UNDO.
@@ -145,8 +166,8 @@ ASSIGN bAboveEq12 = (majorMinor GE 12).
 /* Callbacks are only supported on 11.3+ */
 &IF DECIMAL(SUBSTRING(PROVERSION, 1, INDEX(PROVERSION, '.') + 1)) GE 11.3 &THEN
 DEFINE VARIABLE callback AS rssw.pct.ICompileCallback NO-UNDO.
-DEFINE VARIABLE compileAction AS rssw.pct.CompileCallbackAction NO-UNDO.
-ASSIGN compileAction = rssw.pct.CompileCallbackAction:None.
+DEFINE VARIABLE compileAction AS INTEGER NO-UNDO.
+ASSIGN compileAction = 0.
 &ENDIF
 
 PROCEDURE setOption.
@@ -178,9 +199,11 @@ PROCEDURE setOption.
     WHEN 'FULLKW':U           THEN ASSIGN lOptFullKW = (ipValue EQ '1':U).
     WHEN 'FIELDQLF':U         THEN ASSIGN lOptFldQlf = (ipValue EQ '1':U).
     WHEN 'FULLNAMES':U        THEN ASSIGN lOptFullNames = (ipValue EQ '1':U).
+    WHEN 'RETURNVALUES':U     THEN ASSIGN lOptRetVals = (ipValue EQ '1':U).
     WHEN 'FILELIST':U         THEN ASSIGN iFileList = INTEGER(ipValue).
     WHEN 'NUMFILES':U         THEN ASSIGN iTotLines = INTEGER(ipValue).
     WHEN 'CALLBACKCLASS':U    THEN ASSIGN callbackClass = ipValue.
+    WHEN 'OUTPUTTYPE':U       THEN ASSIGN outputType = ipValue.
 
     OTHERWISE RUN logError IN hSrcProc (SUBSTITUTE("Unknown parameter '&1' with value '&2'" ,ipName, ipValue)).
   END CASE.
@@ -199,6 +222,19 @@ PROCEDURE initModule:
       callback:initialize(hSrcProc).
   END.
 &ENDIF
+  IF (outputType > "") THEN DO:
+    IF (LOOKUP("json", outputType) GT 0) THEN DO:
+      IF bAboveEq117 THEN DO:
+        lOutputJson = TRUE.
+      END.
+      ELSE DO:
+        MESSAGE "JSON outputType is only supported on 11.7+".
+      END.
+    END.
+    IF (LOOKUP("console", outputType) GT 0) THEN DO:
+      lOutputConsole = TRUE.
+    END.
+  END.
 
   /* Gets CRC list */
   DEFINE VARIABLE h AS HANDLE NO-UNDO.
@@ -224,6 +260,8 @@ PROCEDURE initModule:
     ASSIGN cOpts = cOpts + (IF cOpts EQ '' THEN '' ELSE ',') + 'require-field-qualifiers' + (IF bAboveEq1173 THEN ':warning' ELSE '').
   IF lOptFullNames THEN
     ASSIGN cOpts = cOpts + (IF cOpts EQ '' THEN '' ELSE ',') + 'require-full-names' + (IF bAboveEq1173 THEN ':warning' ELSE '').
+  IF lOptRetVals THEN
+    ASSIGN cOpts = cOpts + (IF cOpts EQ '' THEN '' ELSE ',') + 'require-return-values' + (IF bAboveEq1173 THEN ':warning' ELSE '').
 
   IF ProgPerc GT 0 THEN DO:
     ASSIGN iNrSteps = 100 / ProgPerc.
@@ -264,7 +302,6 @@ PROCEDURE compileXref.
   DEFINE VARIABLE cFile    AS CHARACTER  NO-UNDO.
   DEFINE VARIABLE cFile2    AS CHARACTER  NO-UNDO.
   DEFINE VARIABLE cFileExt AS CHARACTER  NO-UNDO.
-  DEFINE VARIABLE cFileExt2 AS CHARACTER  NO-UNDO.
   DEFINE VARIABLE cSaveDir AS CHARACTER NO-UNDO.
   DEFINE VARIABLE cXrefFile AS CHARACTER  NO-UNDO.
   DEFINE VARIABLE cStrXrefFile AS CHARACTER  NO-UNDO.
@@ -275,7 +312,9 @@ PROCEDURE compileXref.
   DEFINE VARIABLE ProcTS    AS DATETIME   NO-UNDO.
   DEFINE VARIABLE cRenameFrom AS CHARACTER NO-UNDO INITIAL ''.
   DEFINE VARIABLE lWarnings AS LOGICAL NO-UNDO INITIAL FALSE.
+  DEFINE VARIABLE lOneWarning AS LOGICAL NO-UNDO INITIAL FALSE.
 
+  EMPTY TEMP-TABLE ttWarnings. /* Emptying the temp-table to store warnings for current file*/
   /* Output progress */
   IF ProgPerc GT 0 THEN DO:
     ASSIGN iLine = iLine + 1.
@@ -316,7 +355,6 @@ PROCEDURE compileXref.
   END.
   ELSE DO:
     RUN adecomm/_osprefx.p(INPUT ipOutFile, OUTPUT cBase2, OUTPUT cFile2).
-    RUN adecomm/_osfext.p(INPUT cFile2, OUTPUT cFileExt2).
     ASSIGN opError = NOT createDir(outputDir, cBase2).
     IF (opError) THEN RETURN.
     ASSIGN opError = NOT createDir(PCTDir, cBase2).
@@ -397,7 +435,7 @@ PROCEDURE compileXref.
 &IF DECIMAL(SUBSTRING(PROVERSION, 1, INDEX(PROVERSION, '.') + 1)) GE 11.3 &THEN
   IF VALID-OBJECT(callback) THEN DO:
     compileAction = callback:beforeCompile(hSrcProc, ipInFile, ipInDir).
-    IF (compileAction EQ rssw.pct.CompileCallbackAction:Skip) THEN
+    IF (compileAction EQ 1) THEN
       RETURN.
   END.
 &ENDIF
@@ -405,7 +443,6 @@ PROCEDURE compileXref.
 /* Before 11.7.3, strict mode compiler was throwing errors. 11.7.3 introduced :warning and :error */
 &IF DECIMAL(SUBSTRING(PROVERSION, 1, INDEX(PROVERSION, '.') + 1)) GE 11.7 &THEN
   IF (cOpts GT "") AND bAboveEq117 AND (NOT bAboveEq1173) THEN DO:
-    EMPTY TEMP-TABLE ttWarnings.
     COMPILE VALUE(IF lRelative THEN ipInFile ELSE ipInDir + '/':U + ipInFile) SAVE=FALSE OPTIONS cOpts NO-ERROR.
     IF COMPILER:ERROR THEN DO i = 1 TO COMPILER:NUM-MESSAGES:
       /* Messages 14786, 14789, 18494 are the only relevant ones */
@@ -433,7 +470,8 @@ PROCEDURE compileXref.
   ASSIGN opError = COMPILER:ERROR.
   IF NOT opError THEN DO:
     /* In order to handle <mapper> element */
-    IF cRenameFrom NE '' THEN DO:
+    IF ((cRenameFrom NE '') AND (cRenameFrom NE ipOutFile)) THEN DO:
+      RUN logVerbose IN hSrcProc (SUBSTITUTE("Mapper: renaming &1/&2 to &1/&3", outputDir, cRenameFrom, ipOutFile)).
       OS-COPY VALUE(outputDir + '/' + cRenameFrom) VALUE(outputDir + '/' + ipOutFile).
       OS-DELETE VALUE(outputDir + '/' + cRenameFrom).
     END.
@@ -444,7 +482,6 @@ PROCEDURE compileXref.
         RUN ImportXref (INPUT cXrefFile, INPUT PCTDir, INPUT ipInFile) NO-ERROR.
     END.
     IF COMPILER:WARNING OR lWarnings THEN DO:
-      OUTPUT STREAM sWarnings TO VALUE(warningsFile).
       DO i = 1 TO COMPILER:NUM-MESSAGES:
         IF bAbove101 THEN DO:
           /* Pointless message coming from strict mode compiler */
@@ -452,22 +489,40 @@ PROCEDURE compileXref.
           /* Messages 2363, 3619 and 3623 are in fact warnings (from -checkdbe switch) */
           IF (COMPILER:GET-MESSAGE-TYPE(i) EQ 2) OR (COMPILER:GET-NUMBER(i) EQ 2363) OR (COMPILER:GET-NUMBER(i) EQ 3619) OR (COMPILER:GET-NUMBER(i) EQ 3623) THEN DO:
             IF (LOOKUP(STRING(COMPILER:GET-NUMBER(i)), SESSION:SUPPRESS-WARNINGS-LIST) EQ 0) THEN DO:
-              PUT STREAM sWarnings UNFORMATTED SUBSTITUTE("[&1] [&3] &2", COMPILER:GET-ROW(i), REPLACE(COMPILER:GET-MESSAGE(i), '~n', ' '), COMPILER:GET-FILE-NAME(i)) SKIP.
+              CREATE ttWarnings.
+              ASSIGN ttWarnings.msgNum   = COMPILER:GET-NUMBER(i)
+                     ttWarnings.rowNum   = COMPILER:GET-ROW(i)
+                     ttWarnings.fileName = COMPILER:GET-FILE-NAME(i)
+                     ttWarnings.msg      = REPLACE(COMPILER:GET-MESSAGE(i), '~n', ' ').
             END.
           END.
         END.
       END.
-      FOR EACH ttWarnings:
-        PUT STREAM sWarnings UNFORMATTED SUBSTITUTE("[&1] [&3] &2", ttWarnings.rowNum, ttWarnings.msg, ttWarnings.fileName) SKIP.
+
+      IF lOutputJson THEN DO:
+        FOR EACH ttWarnings:
+          CREATE ttProjectWarnings.
+          ASSIGN ttProjectWarnings.msgNum       = ttWarnings.msgNum
+                 ttProjectWarnings.rowNum       = ttWarnings.rowNum
+                 ttProjectWarnings.fileName     = REPLACE(ttWarnings.fileName, chr(92), '/')
+                 ttProjectWarnings.msg          = ttWarnings.msg
+                 ttProjectWarnings.mainFileName = REPLACE(ipInDir + (if ipInDir eq '':U then '':U else '/':U) + ipInFile, chr(92), '/').
+        END.
       END.
-      OUTPUT STREAM sWarnings CLOSE.
+      IF lOutputConsole THEN DO:
+        OUTPUT STREAM sWarnings TO VALUE(warningsFile).
+        FOR EACH ttWarnings:
+          PUT STREAM sWarnings UNFORMATTED SUBSTITUTE("[&1] [&3] &2", ttWarnings.rowNum, ttWarnings.msg, ttWarnings.fileName) SKIP.
+          ASSIGN lOneWarning = TRUE.
+        END.
+        OUTPUT STREAM sWarnings CLOSE.
+      END.
     END.
-    ELSE DO:
+    IF NOT lOneWarning THEN DO:
       OS-DELETE VALUE(warningsFile).
     END.
   END.
   ELSE DO:
-    RUN logError IN hSrcProc (SUBSTITUTE("Error compiling file '&1' ...", REPLACE(ipInDir + (IF ipInDir EQ '':U THEN '':U ELSE '/':U) + ipInFile, CHR(92), '/':U))).
     EMPTY TEMP-TABLE ttErrors.
     DO i = 1 TO COMPILER:NUM-MESSAGES:
       IF COMPILER:GET-NUMBER(i) EQ 198 THEN NEXT.
@@ -484,8 +539,22 @@ PROCEDURE compileXref.
       END.
       ASSIGN ttErrors.msg = ttErrors.msg + (IF ttErrors.msg EQ '' THEN '' ELSE '~n') + COMPILER:GET-MESSAGE(i).
     END.
-    FOR EACH ttErrors:
-      RUN displayCompileErrors(ipInDir + (IF ipInDir EQ '':U THEN '':U ELSE '/':U) + ipInFile, ttErrors.fileName, ttErrors.rowNum, ttErrors.colNum, ttErrors.msg).
+
+    IF lOutputJson THEN DO:
+      FOR EACH ttErrors:
+        CREATE ttProjectErrors.
+        ASSIGN ttProjectErrors.fileName      = REPLACE(ttErrors.fileName, chr(92), '/')
+               ttProjectErrors.mainFileName  = REPLACE(ipInDir + (if ipInDir eq '':U then '':U else '/':U) + ipInFile, chr(92), '/')
+               ttProjectErrors.rowNum        = ttErrors.rowNum
+               ttProjectErrors.colNum        = ttErrors.colNum
+               ttProjectErrors.msg           = ttErrors.msg.
+      END.
+    END.
+    IF lOutputConsole THEN DO:
+      RUN logError IN hSrcProc (SUBSTITUTE("Error compiling file '&1' ...", REPLACE(ipInDir + (IF ipInDir EQ '':U THEN '':U ELSE '/':U) + ipInFile, CHR(92), '/':U))).
+      FOR EACH ttErrors:
+        RUN displayCompileErrors(ipInDir + (IF ipInDir EQ '':U THEN '':U ELSE '/':U) + ipInFile, ttErrors.fileName, ttErrors.rowNum, ttErrors.colNum, ttErrors.msg).
+      END.
     END.
   END.
   IF NOT keepXref THEN
@@ -496,6 +565,36 @@ PROCEDURE compileXref.
     IF ERROR-STATUS:ERROR THEN DO:
       OS-DELETE VALUE(PCTDir + '/':U + ipInFile).
     END.
+  END.
+
+END PROCEDURE.
+
+PROCEDURE printErrorsWarningsJson.
+
+  DEFINE INPUT PARAMETER iCompOK AS INTEGER NO-UNDO.
+  DEFINE INPUT PARAMETER iCompFail AS INTEGER NO-UNDO.
+
+  DEFINE VARIABLE dsJsonObj AS JsonObject NO-UNDO.
+  DEFINE VARIABLE ttErr AS JsonArray NO-UNDO.
+  DEFINE VARIABLE ttWarn AS JsonArray NO-UNDO.
+  DEFINE VARIABLE outFile AS CHARACTER NO-UNDO.
+
+  IF lOutputJson THEN DO:
+    dsJsonObj = NEW JsonObject().
+    dsJsonObj:Add("compiledFiles", iCompOK).
+    dsJsonObj:Add("errorFiles", iCompFail).
+
+    ttErr = NEW JsonArray().
+    ttWarn = NEW JsonArray().
+    TEMP-TABLE ttProjectErrors:HANDLE:WRITE-JSON("JsonArray", ttErr).
+    TEMP-TABLE ttProjectWarnings:HANDLE:WRITE-JSON("JsonArray", ttWarn).
+    IF (ttErr:Length GT 0) THEN
+        dsJsonObj:ADD("ttProjectErrors", ttErr).
+    IF (ttWarn:Length GT 0) THEN
+        dsJsonObj:ADD("ttProjectWarnings", ttWarn).
+
+    ASSIGN outFile = PCTDir + '/':U + 'project-result.json':U.
+    dsJsonObj:WriteFile(outFile).
   END.
 
 END PROCEDURE.
@@ -551,7 +650,6 @@ PROCEDURE importXmlXref.
   DEFINE INPUT  PARAMETER pcDir  AS CHARACTER NO-UNDO.
   DEFINE INPUT  PARAMETER pcFile AS CHARACTER NO-UNDO.
 
-  DEFINE VARIABLE cTmp      AS CHARACTER NO-UNDO.
   DEFINE VARIABLE zz        AS INTEGER NO-UNDO.
 
   EMPTY TEMP-TABLE ttXrefInc.
@@ -560,7 +658,7 @@ PROCEDURE importXmlXref.
 
   DATASET Cross-reference:READ-XML("FILE", pcXref, "EMPTY", ?, ?).
 
-  FOR EACH Reference WHERE LOOKUP(Reference-Type, 'INCLUDE,CREATE,REFERENCE,ACCESS,UPDATE,SEARCH,CLASS':U) NE 0:
+  FOR EACH Reference WHERE LOOKUP(Reference.Reference-Type, 'INCLUDE,CREATE,REFERENCE,ACCESS,UPDATE,SEARCH,CLASS':U) NE 0:
     ASSIGN Reference.Object-identifier = TRIM(Reference.Object-identifier).
     IF Reference.Reference-Type EQ 'INCLUDE' THEN DO:
       /* Extract include file name from field (which contains include parameters */
@@ -590,14 +688,14 @@ PROCEDURE importXmlXref.
   END.
 
   OUTPUT TO VALUE (pcDir + '/':U + pcFile + '.inc':U).
-  FOR EACH ttXrefInc BREAK BY ttIncName:
+  FOR EACH ttXrefInc BREAK BY ttXrefInc.ttIncName:
     IF FIRST-OF(ttXrefInc.ttIncName) THEN
       EXPORT ttXrefInc.ttIncName SEARCH(ttXrefInc.ttIncName).
   END.
   OUTPUT CLOSE.
 
   OUTPUT TO VALUE (pcDir + '/':U + pcFile + '.crc':U).
-  FOR EACH ttXrefCRC BREAK BY ttTblName:
+  FOR EACH ttXrefCRC BREAK BY ttXrefCRC.ttTblName:
     IF FIRST-OF(ttXrefCRC.ttTblName) THEN DO:
       FIND CRCList WHERE CRCList.ttTable EQ ttXrefCRC.ttTblName NO-LOCK NO-ERROR.
       IF (AVAILABLE CRCList) THEN DO:
@@ -659,7 +757,7 @@ PROCEDURE importXref PRIVATE.
   INPUT STREAM sXREF2 CLOSE.
 
   OUTPUT TO VALUE (pcDir + '/':U + pcFile + '.inc':U).
-  FOR EACH ttXref WHERE xRefType EQ 'INCLUDE':U NO-LOCK BREAK BY ttXref.xObjID:
+  FOR EACH ttXref WHERE ttXref.xRefType EQ 'INCLUDE':U NO-LOCK BREAK BY ttXref.xObjID:
     IF FIRST-OF (ttXref.xObjID) THEN
       EXPORT ttXref.xObjID SEARCH(ttXref.xObjID).
   END.
@@ -677,7 +775,7 @@ PROCEDURE importXref PRIVATE.
   OUTPUT CLOSE.
 
   OUTPUT TO VALUE (pcDir + '/':U + pcFile + '.hierarchy':U).
-  FOR EACH ttXref WHERE xRefType EQ 'CLASS':U NO-LOCK:
+  FOR EACH ttXref WHERE ttXref.xRefType EQ 'CLASS':U NO-LOCK:
     ASSIGN cTmp = ENTRY(2, ttXref.xObjID).
     IF cTmp BEGINS 'INHERITS ' THEN DO:
       ASSIGN cTmp = SUBSTRING(cTmp, 10). /* To remove INHERITS */
@@ -697,7 +795,7 @@ PROCEDURE importXref PRIVATE.
 
   IF RunList THEN DO:
     OUTPUT TO VALUE (pcDir + '/':U + pcFile + '.run':U).
-    FOR EACH ttXref WHERE xRefType EQ 'RUN':U AND ((ttXref.xObjID MATCHES '*~~.p') OR (ttXref.xObjID MATCHES '*~~.w')) NO-LOCK BREAK BY ttXref.xObjID:
+    FOR EACH ttXref WHERE ttXref.xRefType EQ 'RUN':U AND ((ttXref.xObjID MATCHES '*~~.p') OR (ttXref.xObjID MATCHES '*~~.w')) NO-LOCK BREAK BY ttXref.xObjID:
       IF FIRST-OF (ttXref.xObjID) THEN DO:
         FIND TimeStamps WHERE TimeStamps.ttFile EQ ttXref.xObjID NO-LOCK NO-ERROR.
         IF (NOT AVAILABLE TimeStamps) THEN DO:

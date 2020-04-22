@@ -1,5 +1,5 @@
 /**
- * Copyright 2005-2018 Riverside Software
+ * Copyright 2005-2019 Riverside Software
  *
  *  Licensed under the Apache License, Version 2.0 (the "License");
  *  you may not use this file except in compliance with the License.
@@ -60,6 +60,8 @@ PROCEDURE setOptions:
     RUN setOption IN hComp ('FULLNAMES', IF ENTRY(33, ipPrm, ';') EQ 'true' THEN '1' ELSE '0').
     RUN setOption IN hComp ('FIELDQLF', IF ENTRY(34, ipPrm, ';') EQ 'true' THEN '1' ELSE '0').
     RUN setOption IN hComp ('CALLBACKCLASS', ENTRY(35, ipPrm, ';')).
+    RUN setOption IN hComp ('OUTPUTTYPE', ENTRY(36, ipPrm, ';')).
+    RUN setOption IN hComp ('RETURNVALUES', ENTRY(37, ipPrm, ';')).
 
     RUN initModule IN hComp.
 
@@ -111,6 +113,8 @@ PROCEDURE pctCompile:
 
   ASSIGN opOK = (compNotOk EQ 0)
          opMsg = STRING(compOK) + "/" + STRING(compNotOk) + "/" + STRING(skipped).
+
+  RUN printErrorsWarningsJson IN hComp (INPUT compOK, INPUT compNotOk).
 
 END PROCEDURE.
 

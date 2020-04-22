@@ -1,5 +1,5 @@
 /**
- * Copyright 2005-2018 Riverside Software
+ * Copyright 2005-2019 Riverside Software
  *
  *  Licensed under the Apache License, Version 2.0 (the "License");
  *  you may not use this file except in compliance with the License.
@@ -20,8 +20,8 @@ using Progress.Lang.Class.
 define variable srcDir    as character no-undo.
 define variable tableList as character no-undo.
 define variable h         as handle    no-undo.
-define variable logger    as rssw.pct.LoadDataLogger.
-define variable callback    as rssw.pct.ILoadDataCallback.
+define variable logger    as rssw.pct.LoadDataLogger no-undo.
+define variable callback    as rssw.pct.ILoadDataCallback no-undo.
 define variable callbackCls as character no-undo.
 define variable iErrPerc    as integer   no-undo.
 

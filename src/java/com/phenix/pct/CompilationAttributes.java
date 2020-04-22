@@ -1,5 +1,5 @@
 /**
- * Copyright 2005-2018 Riverside Software
+ * Copyright 2005-2020 Riverside Software
  *
  *  Licensed under the Apache License, Version 2.0 (the "License");
  *  you may not use this file except in compliance with the License.
@@ -26,9 +26,13 @@ import java.util.ArrayList;
 import java.util.List;
 
 import org.apache.tools.ant.BuildException;
+import org.apache.tools.ant.Project;
 import org.apache.tools.ant.types.ResourceCollection;
 
 public class CompilationAttributes implements ICompilationAttributes {
+    protected static final String CONSOLE_OUTPUT_TYPE = "console";
+    protected static final String JSON_OUTPUT_TYPE = "json";
+
     private List<ResourceCollection> resources = new ArrayList<>();
     private File destDir = null;
     private File xRefDir = null;
@@ -60,6 +64,7 @@ public class CompilationAttributes implements ICompilationAttributes {
     private boolean requireFullKeywords = false;
     private boolean requireFieldQualifiers = false;
     private boolean requireFullNames = false;
+    private boolean requireReturnValues = false;
     private String languages = null;
     private int growthFactor = -1;
     private int progPerc = 0;
@@ -67,6 +72,7 @@ public class CompilationAttributes implements ICompilationAttributes {
     private String ignoredIncludes = null;
     private int fileList = 0;
     private String callback = null;
+    private String outputType = null;
 
     // Internal use
     private final PCT parent;
@@ -256,6 +262,11 @@ public class CompilationAttributes implements ICompilationAttributes {
     }
 
     @Override
+    public void setRequireReturnValues(boolean requireReturnValues) {
+        this.requireReturnValues = requireReturnValues;
+    }
+
+    @Override
     public void setStopOnError(boolean stopOnError) {
         this.stopOnError = stopOnError;
     }
@@ -278,6 +289,11 @@ public class CompilationAttributes implements ICompilationAttributes {
     @Override
     public void setCallbackClass(String callback) {
         this.callback = callback;
+    }
+
+    @Override
+    public void setOutputType(String outputType) {
+        this.outputType = outputType;
     }
 
     public List<ResourceCollection> getResources() {
@@ -388,6 +404,10 @@ public class CompilationAttributes implements ICompilationAttributes {
         return requireFullNames;
     }
 
+    public boolean isRequireReturnValues() {
+        return requireReturnValues;
+    }
+
     public String getLanguages() {
         return languages;
     }
@@ -430,6 +450,34 @@ public class CompilationAttributes implements ICompilationAttributes {
 
     public String getCallbackClass() {
         return callback;
+    }
+
+    public List<String> getOutputType() {
+        List<String> retVal = new ArrayList<>();
+        if (outputType != null) {
+            for (String str : outputType.split(",")) {
+                if (CONSOLE_OUTPUT_TYPE.equalsIgnoreCase(str)) {
+                    retVal.add(CONSOLE_OUTPUT_TYPE);
+                } else if (JSON_OUTPUT_TYPE.equalsIgnoreCase(str)) {
+                    retVal.add(JSON_OUTPUT_TYPE);
+                } else {
+                    parent.log("Invalid outputType: '" + str + "'", Project.MSG_WARN);
+                }
+            }
+        }
+        if (retVal.isEmpty())
+            retVal.add(CONSOLE_OUTPUT_TYPE);
+
+        return retVal;
+    }
+
+    public String getOutputTypeAsString() {
+        String retVal = "";
+        for (String str : getOutputType()) {
+            retVal += (retVal.isEmpty() ? "" : ',') + str;
+        }
+
+        return retVal;
     }
 
     protected void writeCompilationProcedure(File f, Charset c) {
