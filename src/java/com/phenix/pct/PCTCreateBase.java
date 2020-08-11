@@ -22,6 +22,7 @@ import java.util.ArrayList;
 import java.util.List;
 
 import org.apache.tools.ant.BuildException;
+import org.apache.tools.ant.Project;
 import org.apache.tools.ant.taskdefs.ExecTask;
 import org.apache.tools.ant.types.Environment;
 import org.apache.tools.ant.types.Environment.Variable;
@@ -36,6 +37,7 @@ import org.apache.tools.ant.types.ResourceCollection;
 public class PCTCreateBase extends PCT {
     private static final int DEFAULT_BLOCK_SIZE = 8;
     private static final int DB_NAME_MAX_LENGTH = 11;
+    private static final String DBUTIL = "_dbutil";
     private static final String NEW_INSTANCE_FLAG = "-newinstance";
     private static final String RELATIVE_FLAG = "-relative";
 
@@ -426,14 +428,12 @@ public class PCTCreateBase extends PCT {
             if (!structFile.exists())
                 throw new BuildException(MessageFormat.format(
                         Messages.getString("PCTCreateBase.6"), structFile.getAbsolutePath()));
-            log(MessageFormat.format("Generating {0} structure", dbName));
-            exec = structCmdLine();
-            exec.execute();
+            log(MessageFormat.format("Creating {0} database structure", dbName));
+            createDatabaseStructure();
         }
 
         if (!noInit) {
-            exec = initCmdLine();
-            exec.execute();
+            procopy();
         }
 
         // Enable large files
@@ -557,8 +557,9 @@ public class PCTCreateBase extends PCT {
      * 
      * @return An ExecTask, ready to be executed
      */
-    private ExecTask initCmdLine() {
+    private void procopy() {
         ExecTask exec = new ExecTask(this);
+        File logFile = new File(destDir, dbName + ".procopy.log");
 
         File srcDB;
         if (sourceDb != null) {
@@ -573,9 +574,10 @@ public class PCTCreateBase extends PCT {
         }
         log(MessageFormat.format("Copying DB {1} to {0}", dbName, srcDB.getAbsolutePath()));
 
-        exec.setExecutable(getExecPath("_dbutil").toString()); //$NON-NLS-1$
+        exec.setExecutable(getExecPath(DBUTIL).toString());
         exec.setDir(destDir);
-        exec.setOutput(new File(destDir, dbName + ".procopy.log"));
+        exec.setFailonerror(true);
+        exec.setOutput(logFile);
         exec.createArg().setValue("procopy"); //$NON-NLS-1$
         exec.createArg().setValue(srcDB.getAbsolutePath());
         exec.createArg().setValue(dbName);
@@ -593,7 +595,13 @@ public class PCTCreateBase extends PCT {
             exec.addEnv(var2);
         }
 
-        return exec;
+        try {
+            exec.execute();
+        } catch (BuildException caught) {
+            log("Error while copying source database", Project.MSG_ERR);
+            log("Log details in '" + logFile.getAbsolutePath() + "'", Project.MSG_ERR);
+            throw caught;
+        }
     }
 
     /**
@@ -601,11 +609,13 @@ public class PCTCreateBase extends PCT {
      * 
      * @return An ExecTask, ready to be executed
      */
-    private ExecTask structCmdLine() {
+    private void createDatabaseStructure() {
+        File logFile = new File(destDir, dbName + ".prostrct.log");
         ExecTask exec = new ExecTask(this);
-        exec.setExecutable(getExecPath("_dbutil").toString()); //$NON-NLS-1$
+        exec.setExecutable(getExecPath(DBUTIL).toString());
         exec.setDir(destDir);
-        exec.setOutput(new File(destDir, dbName + ".prostrct.log"));
+        exec.setFailonerror(true);
+        exec.setOutput(logFile);
         exec.createArg().setValue("prostrct"); //$NON-NLS-1$
         exec.createArg().setValue("create"); //$NON-NLS-1$
         exec.createArg().setValue(dbName);
@@ -622,12 +632,18 @@ public class PCTCreateBase extends PCT {
             exec.addEnv(var2);
         }
 
-        return exec;
+        try {
+            exec.execute();
+        } catch (BuildException caught) {
+            log("Error while creating database structure", Project.MSG_ERR);
+            log("Log details in '" + logFile.getAbsolutePath() + "'", Project.MSG_ERR);
+            throw caught;
+        }
     }
 
     private ExecTask wordRuleCmdLine() {
         ExecTask exec = new ExecTask(this);
-        exec.setExecutable(getExecPath("_dbutil").toString()); //$NON-NLS-1$
+        exec.setExecutable(getExecPath(DBUTIL).toString());
         exec.setDir(destDir);
         exec.createArg().setValue(dbName);
         exec.createArg().setValue("-C"); //$NON-NLS-1$
@@ -648,7 +664,7 @@ public class PCTCreateBase extends PCT {
 
     private ExecTask multiTenantCmdLine() {
         ExecTask exec = new ExecTask(this);
-        exec.setExecutable(getExecPath("_dbutil").toString()); //$NON-NLS-1$
+        exec.setExecutable(getExecPath(DBUTIL).toString());
         exec.setDir(destDir);
         exec.createArg().setValue(dbName);
         exec.createArg().setValue("-C"); //$NON-NLS-1$
@@ -668,7 +684,7 @@ public class PCTCreateBase extends PCT {
 
     private ExecTask enableLargeFilesCmdLine() {
         ExecTask exec = new ExecTask(this);
-        exec.setExecutable(getExecPath("_dbutil").toString()); //$NON-NLS-1$
+        exec.setExecutable(getExecPath(DBUTIL).toString());
         exec.setDir(destDir);
         exec.createArg().setValue(dbName);
         exec.createArg().setValue("-C"); //$NON-NLS-1$
@@ -688,7 +704,7 @@ public class PCTCreateBase extends PCT {
 
     private ExecTask enableAuditingCmdLine() {
         ExecTask exec = new ExecTask(this);
-        exec.setExecutable(getExecPath("_dbutil").toString()); //$NON-NLS-1$
+        exec.setExecutable(getExecPath(DBUTIL).toString());
         exec.setDir(destDir);
         exec.createArg().setValue(dbName);
         exec.createArg().setValue("-C"); //$NON-NLS-1$
@@ -714,7 +730,7 @@ public class PCTCreateBase extends PCT {
 
     private ExecTask indexRebuildAllCmdLine() {
         ExecTask exec = new ExecTask(this);
-        exec.setExecutable(getExecPath("_dbutil").toString()); //$NON-NLS-1$
+        exec.setExecutable(getExecPath(DBUTIL).toString());
         exec.setDir(destDir);
         exec.createArg().setValue(dbName);
         exec.createArg().setValue("-C"); //$NON-NLS-1$

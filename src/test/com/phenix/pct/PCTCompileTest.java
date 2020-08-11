@@ -829,8 +829,6 @@ public class PCTCompileTest extends BuildFileTestNg {
                 return;
         } catch (IOException caught) {
             return;
-        } catch (InvalidRCodeException caught) {
-            return;
         }
 
         configureProject(BASEDIR + "test52/build.xml");
@@ -853,8 +851,6 @@ public class PCTCompileTest extends BuildFileTestNg {
             if ((version.getMajorVersion() == 11) && (version.getMinorVersion() <= 6))
                 return;
         } catch (IOException caught) {
-            return;
-        } catch (InvalidRCodeException caught) {
             return;
         }
 
@@ -879,8 +875,6 @@ public class PCTCompileTest extends BuildFileTestNg {
             if ((version.getMajorVersion() == 11) && (version.getMinorVersion() <= 6))
                 return;
         } catch (IOException caught) {
-            return;
-        } catch (InvalidRCodeException caught) {
             return;
         }
 
@@ -954,8 +948,6 @@ public class PCTCompileTest extends BuildFileTestNg {
             if (version.getMajorVersion() < 11)
                 return;
         } catch (IOException caught) {
-            return;
-        } catch (InvalidRCodeException caught) {
             return;
         }
 
@@ -1211,8 +1203,6 @@ public class PCTCompileTest extends BuildFileTestNg {
                 return;
         } catch (IOException e) {
             return;
-        } catch (InvalidRCodeException e) {
-            return;
         }
 
         configureProject(BASEDIR + "test76/build.xml");
@@ -1234,8 +1224,6 @@ public class PCTCompileTest extends BuildFileTestNg {
             if ((version.getMajorVersion() == 11) && (version.getMinorVersion() <= 2))
                 return;
         } catch (IOException e) {
-            return;
-        } catch (InvalidRCodeException e) {
             return;
         }
 
@@ -1281,7 +1269,7 @@ public class PCTCompileTest extends BuildFileTestNg {
             DLCVersion version = DLCVersion.getObject(new File(System.getProperty("DLC")));
             if ((version.getMajorVersion() == 11) && (version.getMinorVersion() <= 6))
                 return;
-        } catch (IOException | InvalidRCodeException caught) {
+        } catch (IOException caught) {
             return;
         }
 
@@ -1420,8 +1408,6 @@ public class PCTCompileTest extends BuildFileTestNg {
                 return;
         } catch (IOException caught) {
             return;
-        } catch (InvalidRCodeException caught) {
-            return;
         }
 
         configureProject(BASEDIR + "test80/build.xml");
@@ -1473,7 +1459,7 @@ public class PCTCompileTest extends BuildFileTestNg {
             DLCVersion version = DLCVersion.getObject(new File(System.getProperty("DLC")));
             if ((version.getMajorVersion() == 11) && (version.getMinorVersion() <= 6))
                 return;
-        } catch (IOException | InvalidRCodeException caught) {
+        } catch (IOException caught) {
             return;
         }
 
@@ -1520,6 +1506,37 @@ public class PCTCompileTest extends BuildFileTestNg {
         File warningsFile = new File(BASEDIR + "test83/build/.pct/test.p.warnings");
         assertTrue(warningsFile.exists());
         assertTrue(warningsFile.length() > 0);
+    }
+
+    @Test(groups = {"v10"})
+    public void test84() {
+        configureProject(BASEDIR + "test84/build.xml");
+        executeTarget("init");
+        executeTarget("test");
+        File f1 = new File(BASEDIR + "test84/build/test.r");
+        assertTrue(f1.exists());
+    }
+
+    @Test(groups = {"v10"})
+    public void test85() {
+        configureProject(BASEDIR + "test85/build.xml");
+        // First build
+        expectLog("test1", new String[]{"PCTCompile - Progress Code Compiler", "test.p [No r-code]",
+                "test2.p [No r-code]", "2 file(s) compiled"});
+        // Second build, nothing compiled
+        expectLog("test1",
+                new String[]{"PCTCompile - Progress Code Compiler", "0 file(s) compiled"});
+
+        // Touch test.p
+        expectLog("test2", new String[]{"PCTCompile - Progress Code Compiler", //
+                "test.p [R-code older than source]", //
+                "test2.p [R-code older than source]", //
+                "2 file(s) compiled"});
+        // Touch test.i
+        expectLog("test3", new String[]{"PCTCompile - Progress Code Compiler", //
+                "test.p [R-code older than include file: test.i]", //
+                "test2.p [R-code older than include file: test2.i]", //
+                "2 file(s) compiled"});
     }
 
     // Those classes just for the GSON mapping in test79

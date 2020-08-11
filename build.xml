@@ -258,7 +258,7 @@
  
   <target name="classDoc" depends="declare-bootstrap" description="Windows compilation of class documentation">
     <mkdir dir="${build-win-v11}" />
-    <bootstrapCompile destdir="${build-win-v11}" md5="true" minSize="false" graphicalMode="true" dlcHome="${DLC11}" includedPL="false" cpstream="iso8859-1" debugListing="true" listing="true" relativePaths="true" requireFullNames="true" requireFieldQualifiers="true">
+    <bootstrapCompile destdir="${build-win-v11}" md5="true" minSize="false" graphicalMode="true" dlcHome="${DLC11}" includedPL="false" cpstream="iso8859-1" debugListing="true" listing="true" relativePaths="true" requireFullNames="true" requireFieldQualifiers="true" if:true="${dlc.v11.present}">
       <fileset refid="fs.classDoc" />
       <propath>
         <pathelement location="${src.progress}" />
@@ -267,7 +267,7 @@
     </bootstrapCompile>
 
     <mkdir dir="${build-win-v12}" />
-    <bootstrapCompile destdir="${build-win-v12}" md5="true" minSize="false" graphicalMode="true" dlcHome="${DLC12}" includedPL="false" cpstream="iso8859-1" debugListing="true" listing="true" relativePaths="true" requireFullNames="true" requireFieldQualifiers="true">
+    <bootstrapCompile destdir="${build-win-v12}" md5="true" minSize="false" graphicalMode="true" dlcHome="${DLC12}" includedPL="false" cpstream="iso8859-1" debugListing="true" listing="true" relativePaths="true" requireFullNames="true" requireFieldQualifiers="true" if:true="${dlc.v12.present}">
       <fileset refid="fs.classDoc" />
       <propath>
         <pathelement location="${src.progress}" />
@@ -330,6 +330,9 @@
         <include name="za/co/mip/ablduck/resources/ablduck.zip" />
       </fileset>
       <zipfileset src="lib/gson-2.2.4.jar" />
+      <zipfileset src="lib/jaxb-api-2.3.1.jar" />
+      <zipfileset src="lib/jaxb-core-2.3.0.1.jar" />
+      <zipfileset src="lib/jaxb-impl-2.3.2.jar" />
 
       <!-- ABLDuck classes -->
       <zipfileset src="lib/commonmark-0.11.0.jar"/>
@@ -410,7 +413,6 @@
       <zipfileset dir="tests" includes="**/*" prefix="testbox" />
       <zipfileset dir="${src.progress}" includes="Consultingwerk/**/*" prefix="testbox/ClassDocumentation/test3/src" />
       <zipfileset dir="lib" prefix="lib">
-        <include name="jaxb-*.jar" />
         <include name="activation-*.jar" />
         <include name="ast.jar" />
         <include name="ast-dependencies.jar" />

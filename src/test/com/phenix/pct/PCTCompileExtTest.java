@@ -520,7 +520,7 @@ public class PCTCompileExtTest extends BuildFileTestNg {
     }
 
     @Test(groups = {"v10"})
-    public void test34() throws IOException, InvalidRCodeException {
+    public void test34() {
         configureProject(BASEDIR + "test34/build.xml");
         executeTarget("test");
 
@@ -824,8 +824,6 @@ public class PCTCompileExtTest extends BuildFileTestNg {
                 return;
         } catch (IOException caught) {
             return;
-        } catch (InvalidRCodeException caught) {
-            return;
         }
 
         configureProject(BASEDIR + "test52/build.xml");
@@ -848,8 +846,6 @@ public class PCTCompileExtTest extends BuildFileTestNg {
             if ((version.getMajorVersion() == 11) && (version.getMinorVersion() <= 6))
                 return;
         } catch (IOException caught) {
-            return;
-        } catch (InvalidRCodeException caught) {
             return;
         }
 
@@ -874,8 +870,6 @@ public class PCTCompileExtTest extends BuildFileTestNg {
             if ((version.getMajorVersion() == 11) && (version.getMinorVersion() <= 6))
                 return;
         } catch (IOException caught) {
-            return;
-        } catch (InvalidRCodeException caught) {
             return;
         }
 
@@ -1190,8 +1184,6 @@ public class PCTCompileExtTest extends BuildFileTestNg {
                 return;
         } catch (IOException e) {
             return;
-        } catch (InvalidRCodeException e) {
-            return;
         }
 
         configureProject(BASEDIR + "test76/build.xml");
@@ -1213,8 +1205,6 @@ public class PCTCompileExtTest extends BuildFileTestNg {
             if ((version.getMajorVersion() == 11) && (version.getMinorVersion() <= 2))
                 return;
         } catch (IOException e) {
-            return;
-        } catch (InvalidRCodeException e) {
             return;
         }
 
@@ -1267,8 +1257,6 @@ public class PCTCompileExtTest extends BuildFileTestNg {
                 return;
         } catch (IOException caught) {
             return;
-        } catch (InvalidRCodeException caught) {
-            return;
         }
 
         configureProject(BASEDIR + "test80/build.xml");
@@ -1316,6 +1304,37 @@ public class PCTCompileExtTest extends BuildFileTestNg {
     @Test(groups = {"v10"})
     public void test83() {
         // No test case as 'outputType' attribute is not implemented in PCTCompileExt
+    }
+
+    @Test(groups = {"v10"})
+    public void test84() {
+        configureProject(BASEDIR + "test84/build.xml");
+        executeTarget("init");
+        executeTarget("test");
+        File f1 = new File(BASEDIR + "test84/build/test.r");
+        assertTrue(f1.exists());
+    }
+
+    @Test(groups = {"v10"})
+    public void test85() {
+        configureProject(BASEDIR + "test85/build.xml");
+        // First build
+        expectLog("test1", new String[]{"PCTCompile - Progress Code Compiler", "test.p [No r-code]",
+                "test2.p [No r-code]", "2 file(s) compiled"});
+        // Second build, nothing compiled
+        expectLog("test1",
+                new String[]{"PCTCompile - Progress Code Compiler", "0 file(s) compiled"});
+
+        // Touch test.p
+        expectLog("test2", new String[]{"PCTCompile - Progress Code Compiler", //
+                "test.p [R-code older than source]", //
+                "test2.p [R-code older than source]", //
+                "2 file(s) compiled"});
+        // Touch test.i
+        expectLog("test3", new String[]{"PCTCompile - Progress Code Compiler", //
+                "test.p [R-code older than include file: test.i]", //
+                "test2.p [R-code older than include file: test2.i]", //
+                "2 file(s) compiled"});
     }
 
     @Test(groups = {"v10"})
