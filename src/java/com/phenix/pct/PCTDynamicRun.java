@@ -1,5 +1,5 @@
 /**
- * Copyright 2005-2022 Riverside Software
+ * Copyright 2005-2026 Riverside Software
  *
  *  Licensed under the Apache License, Version 2.0 (the "License");
  *  you may not use this file except in compliance with the License.
@@ -58,7 +58,7 @@ public class PCTDynamicRun extends PCTRun {
     }
 
     @Override
-    public void setIniFile(File iniFile) {
+    public void setIniFile(String iniFile) {
         throw new UnsupportedOperationException("No -ininame attribute in this mode");
     }
 
@@ -67,7 +67,12 @@ public class PCTDynamicRun extends PCTRun {
             writer.beginObject();
             writer.name("verbose").value(isVerbose());
             writer.name("super").value(runAttributes.isSuperInit());
-            writer.name("procedure").value(runAttributes.getProcedure());
+            if ((runAttributes.getProcedure() != null)
+                    && !runAttributes.getProcedure().trim().isEmpty())
+                writer.name("procedure").value(runAttributes.getProcedure());
+            if ((runAttributes.getClassName() != null)
+                    && !runAttributes.getClassName().trim().isEmpty())
+                writer.name("className").value(runAttributes.getClassName());
             writer.name("returnValue").value(status.getAbsolutePath());
             writer.name("callback").value(runAttributes.getMainCallback());
             writer.name("propath").beginArray();
@@ -94,6 +99,12 @@ public class PCTDynamicRun extends PCTRun {
             for (PCTConnection dbc : runAttributes.getAllDbConnections()) {
                 writer.beginObject();
                 writer.name("connect").value(dbc.createConnectString());
+                if (dbc.hasCmdLinePassphrase()) {
+                    writer.name("passphrase").value("cmdline");
+                    writer.name("cmd").value(dbc.getPassphraseCmdLine());
+                } else {
+                    writer.name("passphrase").value("none");
+                }
                 writer.name("aliases").beginArray();
 
                 Collection<PCTAlias> aliases = dbc.getAliases();
@@ -152,8 +163,7 @@ public class PCTDynamicRun extends PCTRun {
     @Override
     public void execute() {
         checkDlcHome();
-        if ((runAttributes.getProcedure() == null) || (runAttributes.getProcedure().length() == 0))
-            throw new BuildException("Procedure attribute not defined");
+        runAttributes.checkConfig();
         if ((runAttributes.getOutputParameters() != null)
                 && (runAttributes.getOutputParameters().size() > 2))
             throw new BuildException("Only two OutputParameter nodes allowed");
@@ -174,7 +184,7 @@ public class PCTDynamicRun extends PCTRun {
 
             if (Os.isFamily(Os.FAMILY_WINDOWS)) {
                 writeIniFile();
-                super.setIniFile(iniFile);
+                super.setIniFile(iniFile.toString());
             } else {
                 Environment.Variable var = new Environment.Variable();
                 var.setKey("PROPATH"); //$NON-NLS-1$
@@ -188,8 +198,8 @@ public class PCTDynamicRun extends PCTRun {
             exec.createArg().setValue("-p");
             exec.createArg().setValue(getProgressProcedures().getDynamicRunProcedure());
 
-            if (getIncludedPL() && !extractPL(pctLib)) {
-                throw new BuildException("Unable to extract pct.pl.");
+            if (!extractPL(pctLib)) {
+                throw new BuildException("Unable to extract pct.pl");
             }
 
             exec.execute();

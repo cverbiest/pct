@@ -6,7 +6,7 @@
   <taskdef name="run" classname="com.phenix.pct.PCTRun" />
   <taskdef name="dynrun" classname="com.phenix.pct.PCTDynamicRun" />
   <taskdef name="compile_ext" classname="com.phenix.pct.CompilationWrapper" />
-  <taskdef name="db_create" classname="com.phenix.pct.PCTCreateBase" />
+  <taskdef name="db_create" classname="com.phenix.pct.PCTCreateDatabase" />
   <taskdef name="schema_load" classname="com.phenix.pct.PCTLoadSchema" />
   <taskdef name="schema_dump" classname="com.phenix.pct.PCTDumpSchema" />
   <taskdef name="data_load" classname="com.phenix.pct.PCTLoadData" />
@@ -18,14 +18,13 @@
   <taskdef name="incr_dump" classname="com.phenix.pct.PCTDumpIncremental" />
   <taskdef name="crc" classname="com.phenix.pct.PCTCRC" />
   <taskdef name="xcode" classname="com.phenix.pct.PCTXCode" />
-  <taskdef name="prounit" classname="net.cordova.prounit.ProUnit" />
   <taskdef name="ablunit" classname="com.phenix.pct.ABLUnit" />
-  <taskdef name="oeunit" classname="com.phenix.pct.OEUnit" />
   <taskdef name="schema_doc" classname="com.phenix.pct.PCTSchemaDoc" />
   <taskdef name="progress_version" classname="com.phenix.pct.ProgressVersion" />
   <taskdef name="version" classname="com.phenix.pct.Version" />
   <taskdef name="dump_sequences" classname="com.phenix.pct.DumpSequences" />
   <taskdef name="sports2000" classname="com.phenix.pct.Sports2000" />
+  <taskdef name="sports2020" classname="com.phenix.pct.Sports2020" />
   <taskdef name="dump_users" classname="com.phenix.pct.PCTDumpUsers" />
   <taskdef name="load_users" classname="com.phenix.pct.PCTLoadUsers" />
   <taskdef name="dlc_home" classname="com.phenix.pct.DlcHome" />

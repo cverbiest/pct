@@ -1,5 +1,5 @@
 /**
- * Copyright 2005-2019 Riverside Software
+ * Copyright 2005-2026 Riverside Software
  *
  *  Licensed under the Apache License, Version 2.0 (the "License");
  *  you may not use this file except in compliance with the License.
@@ -24,6 +24,6 @@ if (dynamic-function('getParameter' in source-procedure, input 'callbackClass') 
     message "Callbacks are only supported on 11.3+".
 end.
 
-run prodict/load_d.p (tableList, srcDir + '/'). 
+run prodict/load_d.p (tableList, srcDir + '/').
 
 return "0":U.

@@ -1,5 +1,5 @@
 /**
- * Copyright 2005-2022 Riverside Software
+ * Copyright 2005-2026 Riverside Software
  *
  *  Licensed under the Apache License, Version 2.0 (the "License");
  *  you may not use this file except in compliance with the License.
@@ -55,6 +55,11 @@ public class CompilationWrapper extends PCT implements IRunAttributes, ICompilat
             if (numThreads > 1) {
                 ((PCTBgCompile) pctTask).setNumThreads(numThreads);
             }
+        } else if ("bootstrapCompile".equalsIgnoreCase(getRuntimeConfigurableWrapper().getElementTag())) {
+            pctTask = new PCTCompile();
+            ((PCTCompile) pctTask).skipEmbeddedPL();
+            ((PCTCompile) pctTask).setRunAttributes(runAttributes);
+            ((PCTCompile) pctTask).setCompilationAttributes(compAttributes);
         } else {
             pctTask = new PCTCompile();
             ((PCTCompile) pctTask).setRunAttributes(runAttributes);
@@ -65,7 +70,6 @@ public class CompilationWrapper extends PCT implements IRunAttributes, ICompilat
         }
         pctTask.bindToOwner(this);
         pctTask.setDlcHome(getDlcHome());
-        pctTask.setIncludedPL(getIncludedPL());
         pctTask.execute();
     }
 
@@ -372,7 +376,7 @@ public class CompilationWrapper extends PCT implements IRunAttributes, ICompilat
     }
 
     @Override
-    public void setParamFile(File pf) {
+    public void setParamFile(String pf) {
         runAttributes.setParamFile(pf);
     }
 
@@ -407,7 +411,7 @@ public class CompilationWrapper extends PCT implements IRunAttributes, ICompilat
     }
 
     @Override
-    public void setIniFile(File iniFile) {
+    public void setIniFile(String iniFile) {
         runAttributes.setIniFile(iniFile);
     }
 
@@ -513,7 +517,12 @@ public class CompilationWrapper extends PCT implements IRunAttributes, ICompilat
 
     @Override
     public void setProcedure(String procedure) {
-        throw new BuildException("Can't set procedure attribute here");
+        throw new BuildException("Cannot set procedure attribute here");
+    }
+
+    @Override
+    public void setClassName(String className) {
+        throw new BuildException("Cannot set className attribute");
     }
 
     @Override
@@ -523,12 +532,22 @@ public class CompilationWrapper extends PCT implements IRunAttributes, ICompilat
 
     @Override
     public void setClientMode(String clientMode) {
-        throw new BuildException("Can't set clientMode attribute in compilation task");
+        throw new BuildException("Cannot set clientMode attribute in compilation task");
+    }
+
+    @Override
+    public void setClrnetcore(boolean clrnetcore) {
+        runAttributes.setClrnetcore(clrnetcore);
+    }
+
+    @Override
+    public void setCaseSensitiveClasses(boolean caseSensitive) {
+        runAttributes.setCaseSensitiveClasses(caseSensitive);
     }
 
     @Override
     public void setParameter(String param) {
-        throw new BuildException("Can't set parameter attribute here");
+        throw new BuildException("Cannot set parameter attribute here");
     }
 
     @Override

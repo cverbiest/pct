@@ -20,10 +20,19 @@
 
     <touch file="dictdb.df" />
     <mkdir dir="profiler/progress" />
-    <unzip src="oe-profiler-data-11.7-Win.zip" dest="profiler/progress">
+    <unzip src="oe-profiler-data-12.2-Win.zip" dest="profiler/progress" overwrite="true">
       <flattenmapper />
     </unzip>
-    <unzip src="oe-profiler-data-12.2-Win.zip" dest="profiler/progress" overwrite="true">
+    <unzip src="oe-profiler-data-12.8-Win.zip" dest="profiler/progress" overwrite="true">
+      <flattenmapper />
+    </unzip>
+    <unzip src="oe-profiler-data-12.8-Linux.zip" dest="profiler/progress" overwrite="true">
+      <flattenmapper />
+    </unzip>
+    <unzip src="oe-profiler-data-13.1-Win.zip" dest="profiler/progress" overwrite="true">
+      <flattenmapper />
+    </unzip>
+    <unzip src="oe-profiler-data-13.1-Linux.zip" dest="profiler/progress" overwrite="true">
       <flattenmapper />
     </unzip>
   </target>

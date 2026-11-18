@@ -1,5 +1,5 @@
 /**
- * Copyright 2005-2022 Riverside Software
+ * Copyright 2005-2026 Riverside Software
  *
  *  Licensed under the Apache License, Version 2.0 (the "License");
  *  you may not use this file except in compliance with the License.
@@ -16,21 +16,32 @@
  */
 package com.phenix.pct;
 
+import java.io.File;
+import java.io.IOException;
+
 import org.apache.tools.ant.BuildException;
 
-import java.io.File;
-
 /**
- * Generates a file with the description of the classes of all assemblies
- * 
- * @author <a href="mailto:g.querret+PCT@gmail.com">Gilles QUERRET</a>
+ * Generates a JSON file with the description of all .Net types available in the OpenEdge session. Generation is
+ * delegated to PCTTools.dll (https://github.com/clement-brodu/PCTTools).
  */
 public class AssemblyCatalog extends PCTRun {
+    private static final String PCTTOOLS_RESOURCE = "/assemblycatalog/PCTTools.dll";
+
     private File destFile = null;
+    private File pctTools = null;
+
+    // Internal use
+    private File workDir = null;
+
+    public AssemblyCatalog() {
+        super();
+        workDir = new File(System.getProperty(PCT.TMPDIR), "asmcat" + PCT.nextRandomInt());
+    }
 
     /**
      * Assembly catalog output file
-     * 
+     *
      * @param destFile File
      */
     public void setDestFile(File destFile) {
@@ -38,19 +49,58 @@ public class AssemblyCatalog extends PCTRun {
     }
 
     /**
-     * Do the work
-     * 
-     * @throws BuildException Something went wrong
+     * Use another version of PCTTools.dll instead of the one bundled in PCT
+     *
+     * @param pctTools File
      */
+    public void setPctTools(File pctTools) {
+        this.pctTools = pctTools;
+    }
+
     @Override
     public void execute() {
-        if (this.destFile == null) {
-            this.cleanup();
+        if (destFile == null) {
+            cleanup();
             throw new BuildException(Messages.getString("PCTCRC.0")); //$NON-NLS-1$
         }
+        if ((pctTools != null) && !pctTools.isFile()) {
+            cleanup();
+            throw new BuildException("Unable to find PCTTools library " + pctTools.getAbsolutePath());
+        }
 
-        this.setProcedure("Consultingwerk/assembliesCatalog.p"); //$NON-NLS-1$
-        this.setParameter(destFile.toString());
+        File dll = pctTools;
+        if (dll == null) {
+            try {
+                dll = extractPCTTools();
+            } catch (IOException caught) {
+                cleanup();
+                throw new BuildException("Unable to extract PCTTools library", caught);
+            }
+        }
+
+        setProcedure("pct/v12/assemblyCatalog.p"); //$NON-NLS-1$
+        addParameter(new RunParameter("destFile", destFile.getAbsolutePath())); //$NON-NLS-1$
+        addParameter(new RunParameter("pctTools", dll.getAbsolutePath())); //$NON-NLS-1$
+
         super.execute();
+    }
+
+    private File extractPCTTools() throws IOException {
+        if (!createDir(workDir))
+            throw new IOException("Unable to create directory " + workDir.getAbsolutePath());
+        if (PCT.class.getResource(PCTTOOLS_RESOURCE) == null)
+            throw new IOException("Resource " + PCTTOOLS_RESOURCE + " not found in PCT.jar");
+        File dll = new File(workDir, "PCTTools.dll");
+        copyStreamFromJar(PCTTOOLS_RESOURCE, dll);
+        return dll;
+    }
+
+    @Override
+    protected void cleanup() {
+        super.cleanup();
+
+        if (getDebugPCT())
+            return;
+        deleteDirectory(workDir);
     }
 }

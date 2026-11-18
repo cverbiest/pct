@@ -1,8 +1,8 @@
 {
   "name": "PCT",
-  "version": "221-pre",
+  "version": "233-pre",
   "charset": "utf-8",
-  "oeversion": "12.2",
+  "oeversion": "12.8",
   "graphicalMode": false,
   "extraParameters": "",
   "buildPath": [
@@ -10,29 +10,38 @@
       "type": "source",
       "path": "src/progress",
       "build": "build/build-v12",
-      "excludes": "Consultingwerk/**,pct/v10/**,pct/v11/**,pct/v102b/**,pct/pctOEUnitRunner.p,pct/v12/loadSch124.p"
+      "excludes": "pct/v10/**,pct/v11/**,pct/v13/**,pct/v102b/**,pct/v12/loadSch124.p"
     }
   ],
   "numThreads": 1,
   "dbConnections": [
-    { "name": "empty", "connect": "-db target/db/empty12 -ld empty -RO", "dumpFile": "empty.df", "aliases": [ "empty2" ] }
+    { "name": "empty", "connect": "-db target/db/empty12 -ld empty -RO", "schemaFile": "empty.df", "aliases": [ "dictdb2" ] }
   ],
   "profiles": [
     {
-      "name": "v11",
+      "name": "v13",
       "inherits": "default",
       "value": {
-        "oeversion": "11.7",
+        "oeversion": "13.1",
         "buildPath": [
           {
             "type": "source",
             "path": "src/progress",
-            "build": "build/build-v11",
-            "excludes": "Consultingwerk/**,pct/v10/**,pct/v12/**,pct/v102b/**,pct/pctOEUnitRunner.p"
+            "build": "build/build-v13",
+            "excludes": "pct/v10/**,pct/v11/**,pct/v12/**,pct/v102b/**"
           }
         ],
         "dbConnections": [
-          { "name": "empty", "connect": "-db target/db/empty11 -ld empty -RO", "dumpFile": "empty.df", "aliases": [ "empty2" ] }
+          { "name": "empty", "connect": "-db target/db/empty13 -ld empty -RO", "schemaFile": "empty.df", "aliases": [ "dictdb2" ] }
+        ]
+      }
+    },
+    {
+      "name": "devcontainer",
+      "inherits": "default",
+      "value": {
+        "dbConnections": [
+          { "name": "empty", "connect": "-db sports -ld empty -H dbserver -S 12345", "schemaFile": "empty.df", "aliases": [ "dictdb2" ] }
         ]
       }
     }

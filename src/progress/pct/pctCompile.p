@@ -1,5 +1,5 @@
 /**
- * Copyright 2005-2019 Riverside Software
+ * Copyright 2005-2026 Riverside Software
  *
  *  Licensed under the Apache License, Version 2.0 (the "License");
  *  you may not use this file except in compliance with the License.
@@ -97,35 +97,35 @@ IF (iCompFail GE 1) THEN
   MESSAGE "Failed to compile " iCompFail " file(s)".
 RETURN (IF iCompFail GT 0 THEN '10' ELSE '0').
 
-PROCEDURE logError.
+PROCEDURE logError:
   DEFINE INPUT PARAMETER ipMsg AS CHARACTER NO-UNDO.
 
   MESSAGE ipMsg.
 
 END PROCEDURE.
 
-PROCEDURE logWarning.
+PROCEDURE logWarning:
   DEFINE INPUT PARAMETER ipMsg AS CHARACTER NO-UNDO.
 
   MESSAGE ipMsg.
 
 END PROCEDURE.
 
-PROCEDURE logInfo.
+PROCEDURE logInfo:
   DEFINE INPUT PARAMETER ipMsg AS CHARACTER NO-UNDO.
 
   MESSAGE ipMsg.
 
 END PROCEDURE.
 
-PROCEDURE logVerbose.
+PROCEDURE logVerbose:
   DEFINE INPUT PARAMETER ipMsg AS CHARACTER NO-UNDO.
 
   IF pctVerbose THEN MESSAGE ipMsg.
 
 END PROCEDURE.
 
-PROCEDURE logDebug.
+PROCEDURE logDebug:
   DEFINE INPUT PARAMETER ipMsg AS CHARACTER NO-UNDO.
 
   IF pctVerbose THEN MESSAGE ipMsg.

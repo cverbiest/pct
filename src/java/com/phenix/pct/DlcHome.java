@@ -1,5 +1,5 @@
 /**
- * Copyright 2005-2022 Riverside Software
+ * Copyright 2005-2026 Riverside Software
  *
  *  Licensed under the Apache License, Version 2.0 (the "License");
  *  you may not use this file except in compliance with the License.
@@ -30,7 +30,7 @@ public class DlcHome extends Task {
     @Override
     public void execute() {
         if (value == null)
-            throw new BuildException("Value can't be null");
+            throw new BuildException("Value cannot be null");
         getProject().setProperty(GLOBAL_DLCHOME, value.getAbsolutePath());
 
         DefaultExcludes excludes = new DefaultExcludes();

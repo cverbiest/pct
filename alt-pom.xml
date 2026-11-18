@@ -2,8 +2,7 @@
   <modelVersion>4.0.0</modelVersion>
   <groupId>eu.rssw.pct</groupId>
   <artifactId>pct</artifactId>
-  <version>224-pre</version>
-  <packaging>jar</packaging>
+  <version>233-pre</version>
 
   <name>PCT</name>
   <description>OpenEdge plugin for Ant</description>
@@ -19,7 +18,7 @@
   <developers>
     <developer>
       <id>gquerret</id>
-      <name>Gilles QUERRET</name>
+      <name>Gilles Querret</name>
     </developer>
   </developers>
 

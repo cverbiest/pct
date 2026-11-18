@@ -1,5 +1,5 @@
 /**
- * Copyright 2005-2022 Riverside Software
+ * Copyright 2005-2026 Riverside Software
  *
  *  Licensed under the Apache License, Version 2.0 (the "License");
  *  you may not use this file except in compliance with the License.
@@ -56,7 +56,7 @@ public interface IRunAttributes {
     /**
      * Parameter file (-pf attribute)
      */
-    void setParamFile(File pf);
+    void setParamFile(String pf);
 
     /**
      * Thousands separator (-numsep attribute)
@@ -97,7 +97,7 @@ public interface IRunAttributes {
     /**
      * Sets .ini file to use (-basekey INI -ininame xxx)
      */
-    void setIniFile(File iniFile);
+    void setIniFile(String iniFile);
 
     /**
      * Stream code page (-cpstream attribute)
@@ -206,6 +206,11 @@ public interface IRunAttributes {
     void setProcedure(String procedure);
 
     /**
+     * Main procedure to be executed
+     */
+    void setClassName(String className);
+
+    /**
      * XCode session key
      */
     void setXCodeSessionKey(String xCodeSessionKey);
@@ -244,4 +249,15 @@ public interface IRunAttributes {
      * Client mode of ABL session (one of rg, rq, rr, rx)
      */
     void setClientMode(String clientMode);
+
+    /**
+     * Use .Net core (-clrnetcore parameter)
+     */
+    void setClrnetcore(boolean clrnetcore);
+
+    /**
+     * Use case sensitive classes (-casesensitiveclasses parameter)
+     */
+    void setCaseSensitiveClasses(boolean caseSensitive);
+
 }

@@ -1,5 +1,5 @@
 /**
- * Copyright 2005-2022 Riverside Software
+ * Copyright 2005-2026 Riverside Software
  *
  *  Licensed under the Apache License, Version 2.0 (the "License");
  *  you may not use this file except in compliance with the License.
@@ -33,6 +33,7 @@ public class Profiler {
     private String description = "Default description";
     private String tracing;
     private String traceFilter;
+    private String extension = ".out";
     private File outputFile = null;
     private File outputDir = null;
     private File listings = null;
@@ -140,6 +141,14 @@ public class Profiler {
         return traceFilter;
     }
 
+    public void setExtension(String extension) {
+        this.extension = extension;
+    }
+
+    public String getExtension() {
+        return extension;
+    }
+
     /**
      * Validates object. If background task is set to true, then you can't set outputFile, only outputDir
      */
@@ -160,7 +169,7 @@ public class Profiler {
             throw new BuildException("Only outputDir can be set for multi-threaded tasks");
         if (listings != null) {
             if (!listings.exists() || !listings.isDirectory())
-                throw new BuildException("Listing dir doesn't exist or is not a directory");
+                throw new BuildException("Listing directory does not exist or is not a directory");
         }
     }
 }

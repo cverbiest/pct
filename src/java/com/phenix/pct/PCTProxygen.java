@@ -1,5 +1,5 @@
 /**
- * Copyright 2005-2022 Riverside Software
+ * Copyright 2005-2026 Riverside Software
  *
  *  Licensed under the Apache License, Version 2.0 (the "License");
  *  you may not use this file except in compliance with the License.
@@ -130,6 +130,7 @@ public class PCTProxygen extends PCT {
         }
 
         checkDlcHome();
+        setJavaEnv();
 
         // Creates a new Java task to launch proxygen task
         if (pxg == null) {

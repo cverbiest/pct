@@ -1,5 +1,5 @@
 /**
- * Copyright 2005-2022 Riverside Software
+ * Copyright 2005-2026 Riverside Software
  *
  *  Licensed under the Apache License, Version 2.0 (the "License");
  *  you may not use this file except in compliance with the License.
@@ -78,12 +78,12 @@ public class PCTCompile extends PCTRun {
 
     @Override
     public void setProcedure(String procedure) {
-        throw new BuildException("Can't set procedure attribute here");
+        throw new BuildException("Cannot set procedure attribute here");
     }
 
     @Override
     public void setParameter(String param) {
-        throw new BuildException("Can't set parameter attribute here");
+        throw new BuildException("Cannot set parameter attribute here");
     }
 
     /**
@@ -224,8 +224,10 @@ public class PCTCompile extends PCTRun {
             bw.newLine();
             bw.write("FULLNAMES=" + (compAttrs.isRequireFullNames() ? 1 : 0));
             bw.newLine();
-            bw.write("RETURNVALUES=" + (compAttrs.isRequireReturnValues() ? 1 : 0));
-            bw.newLine();
+            if (getVersion().compareTo(new DLCVersion(12, 2, "0")) >= 0) {
+                bw.write("RETURNVALUES=" + (compAttrs.isRequireReturnValues() ? 1 : 0));
+                bw.newLine();
+            }
             bw.write("FILELIST=" + compAttrs.getFileList());
             bw.newLine();
             if (compAttrs.getCallbackClass() != null) {
@@ -260,6 +262,10 @@ public class PCTCompile extends PCTRun {
         if (!compAttrs.isXcode() && (runAttributes.getXCodeSessionKey() != null) && !runAttributes.getXCodeSessionKey().trim().isEmpty()) {
             log("xcode attribute set to false, resetting xcodeSessionKey attribute");
             runAttributes.setXCodeSessionKey(null);
+        }
+
+        if (compAttrs.isRequireReturnValues() && getVersion().compareTo(new DLCVersion(12, 2, "0")) < 0) {
+            log("Skip requireReturnValues attribute, as it is set to true but not available in this version of OpenEdge");
         }
 
         // Test xRef directory

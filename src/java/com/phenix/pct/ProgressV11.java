@@ -1,5 +1,5 @@
 /**
- * Copyright 2005-2022 Riverside Software
+ * Copyright 2005-2026 Riverside Software
  *
  *  Licensed under the Apache License, Version 2.0 (the "License");
  *  you may not use this file except in compliance with the License.
@@ -79,6 +79,11 @@ public class ProgressV11 implements ProgressProcedures {
     }
 
     @Override
+    public String getConnectPassphraseCmdLineString() {
+        return getString("ProgressV11.17"); //$NON-NLS-1$
+    }
+
+    @Override
     public String getAliasString() {
         return getString("ProgressV11.2"); //$NON-NLS-1$
     }
@@ -96,6 +101,11 @@ public class ProgressV11 implements ProgressProcedures {
     @Override
     public String getRunString() {
         return getString("ProgressV11.4"); //$NON-NLS-1$
+    }
+
+    @Override
+    public String getDynamicInvokeString() {
+        return getString("ProgressV11.18"); //$NON-NLS-1$
     }
 
     @Override
@@ -121,6 +131,11 @@ public class ProgressV11 implements ProgressProcedures {
     @Override
     public String getAfterRun() {
         return getString("ProgressV11.10"); //$NON-NLS-1$
+    }
+
+    @Override
+    public String getAfterDynamicInvoke() {
+        return getString("ProgressV11.19"); //$NON-NLS-1$
     }
 
     @Override

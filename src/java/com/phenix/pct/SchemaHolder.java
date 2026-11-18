@@ -1,5 +1,5 @@
 /**
- * Copyright 2005-2022 Riverside Software
+ * Copyright 2005-2026 Riverside Software
  *
  *  Licensed under the Apache License, Version 2.0 (the "License");
  *  you may not use this file except in compliance with the License.
@@ -20,7 +20,7 @@ import java.io.File;
 import java.util.Collection;
 
 /**
- * Schema holders class. Used as a nested element of PCTCreateBase.
+ * Schema holders class. Used as a nested element of PCTCreateDatabase.
  * 
  * @author <a href="mailto:g.querret+PCT@gmail.com">Gilles QUERRET </a>
  * @version $Revision$

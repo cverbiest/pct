@@ -1,5 +1,5 @@
 /**
- * Copyright 2005-2019 Riverside Software
+ * Copyright 2005-2026 Riverside Software
  *
  *  Licensed under the Apache License, Version 2.0 (the "License");
  *  you may not use this file except in compliance with the License.
@@ -15,7 +15,7 @@
  *
  */
 
-ROUTINE-LEVEL ON ERROR UNDO, THROW.
+BLOCK-LEVEL ON ERROR UNDO, THROW.
 
 DEFINE VARIABLE h AS HANDLE NO-UNDO.
 
@@ -29,8 +29,4 @@ RUN setDebugMode IN h (INTEGER(DYNAMIC-FUNCTION('getParameter' IN SOURCE-PROCEDU
 RUN setRemoveEmptyDFfile IN h (DYNAMIC-FUNCTION('getParameter' IN SOURCE-PROCEDURE, INPUT 'removeEmptyDFfile') EQ "true").
 RUN setSilent IN h(yes).
 RUN doDumpIncr IN h.
-DELETE PROCEDURE h. 
-
-CATCH e AS Progress.Lang.AppError :
-    MESSAGE e:ReturnValue.  
-END CATCH.
+DELETE PROCEDURE h.

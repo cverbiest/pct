@@ -1,5 +1,5 @@
 /**
- * Copyright 2005-2022 Riverside Software
+ * Copyright 2005-2026 Riverside Software
  *
  *  Licensed under the Apache License, Version 2.0 (the "License");
  *  you may not use this file except in compliance with the License.
@@ -34,16 +34,19 @@ public abstract interface ProgressProcedures {
     String getInitString();
     String getCallbackString();
     String getConnectString();
+    String getConnectPassphraseCmdLineString();
     String getAliasString();
     String getDBAliasString();
     String getPropathString();
     String getSuperInitString();
     String getRunString();
+    String getDynamicInvokeString();
     String getReturnProc();
     String getParameterString();
     String getOutputParameterDeclaration();
     String getOutputParameterProc();
     String getAfterRun();
+    String getAfterDynamicInvoke();
     String getOutputParameterCall();
     String getQuit();
     String getXCodeSessionKey();

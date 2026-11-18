@@ -1,5 +1,5 @@
 /**
- * Copyright 2005-2022 Riverside Software
+ * Copyright 2005-2026 Riverside Software
  *
  *  Licensed under the Apache License, Version 2.0 (the "License");
  *  you may not use this file except in compliance with the License.
@@ -49,7 +49,7 @@ import org.apache.tools.ant.util.FileUtils;
  */
 public class PCTRun extends PCT implements IRunAttributes {
     protected GenericExecuteOptions runAttributes;
-    
+
     protected Path internalPropath = null;
 
     // Internal use
@@ -67,6 +67,8 @@ public class PCTRun extends PCT implements IRunAttributes {
     private File profilerParamFile = null;
     private boolean prepared = false;
     private Charset charset = null;
+    // Set to false only during the internal PCT build process
+    private boolean useEmbeddedPL = true;
 
     /**
      * Default constructor
@@ -109,6 +111,10 @@ public class PCTRun extends PCT implements IRunAttributes {
 
     protected void setRunAttributes(GenericExecuteOptions attrs) {
         this.runAttributes = attrs;
+    }
+
+    public void skipEmbeddedPL() {
+        this.useEmbeddedPL = false;
     }
 
     /**
@@ -185,7 +191,7 @@ public class PCTRun extends PCT implements IRunAttributes {
     }
 
     @Override
-    public void setParamFile(File pf) {
+    public void setParamFile(String pf) {
         runAttributes.setParamFile(pf);
     }
 
@@ -225,7 +231,7 @@ public class PCTRun extends PCT implements IRunAttributes {
     }
 
     @Override
-    public void setIniFile(File iniFile) {
+    public void setIniFile(String iniFile) {
         runAttributes.setIniFile(iniFile);
     }
 
@@ -245,6 +251,11 @@ public class PCTRun extends PCT implements IRunAttributes {
     }
 
     @Override
+    public void setClassName(String className) {
+        runAttributes.setClassName(className);
+    }
+
+    @Override
     public void setXCodeSessionKey(String xCodeSessionKey) {
         runAttributes.setXCodeSessionKey(xCodeSessionKey);
     }
@@ -252,6 +263,16 @@ public class PCTRun extends PCT implements IRunAttributes {
     @Override
     public void setClientMode(String clientMode) {
         runAttributes.setClientMode(clientMode);
+    }
+
+    @Override
+    public void setClrnetcore(boolean clrnetcore) {
+        runAttributes.setClrnetcore(clrnetcore);
+    }
+
+    @Override
+    public void setCaseSensitiveClasses(boolean caseSensitive) {
+        runAttributes.setCaseSensitiveClasses(caseSensitive);
     }
 
     @Override
@@ -384,10 +405,8 @@ public class PCTRun extends PCT implements IRunAttributes {
      */
     @Override
     public void execute() {
-
         checkDlcHome();
-        if ((runAttributes.getProcedure() == null) || (runAttributes.getProcedure().length() == 0))
-            throw new BuildException("Procedure attribute not defined");
+        runAttributes.checkConfig();
 
         if (!prepared) {
             prepareExecTask();
@@ -412,9 +431,8 @@ public class PCTRun extends PCT implements IRunAttributes {
             // Startup procedure
             exec.createArg().setValue("-p"); //$NON-NLS-1$
             exec.createArg().setValue(initProc.getAbsolutePath());
-            if (getIncludedPL() && !extractPL(pctLib)) {
-                throw new BuildException("Unable to extract pct.pl.");
-            }
+            if (useEmbeddedPL && !extractPL(pctLib))
+                throw new BuildException("Unable to extract pct.pl");
 
             // OE12 ? Define failOnError and resultProperty
             if (getDLCMajorVersion() >= 12) {
@@ -590,10 +608,10 @@ public class PCTRun extends PCT implements IRunAttributes {
                     bw.write("-FILENAME \"" + runAttributes.getProfiler().getOutputFile().getAbsolutePath() + "\"");
                     bw.newLine();
                 } else {
-                    // Assuming nobody will use file names with double quotes in this case... 
-                    bw.write("-FILENAME \""
-                            + new File(runAttributes.getProfiler().getOutputDir(), "profiler" + profilerOutID
-                                    + ".out\""));
+                    // Assuming nobody will use file names with double quotes in this case...
+                    bw.write("-FILENAME \"" + new File(runAttributes.getProfiler().getOutputDir(),
+                            "profiler" + profilerOutID + runAttributes.getProfiler().getExtension()
+                                    + "\""));
                     bw.newLine();
                 }
                 if (runAttributes.getProfiler().hasCoverage()) {
@@ -638,12 +656,16 @@ public class PCTRun extends PCT implements IRunAttributes {
                 bw.newLine();
             }
 
-            // Defines database connections and aliases
+            // Define database connections and aliases
             int dbNum = 1;
             for (PCTConnection dbc : runAttributes.getAllDbConnections()) {
-                String connect = dbc.createConnectString();
-                bw.write(MessageFormat.format(this.getProgressProcedures().getConnectString(),
-                        connect));
+                if (dbc.hasCmdLinePassphrase()) {
+                    bw.write(MessageFormat.format(this.getProgressProcedures().getConnectPassphraseCmdLineString(),
+                            dbc.createConnectString(), dbc.getPassphraseCmdLine()));
+                } else {
+                    bw.write(MessageFormat.format(this.getProgressProcedures().getConnectString(),
+                            dbc.createConnectString()));
+                }
 
                 Collection<PCTAlias> aliases = dbc.getAliases();
                 if (aliases != null) {
@@ -663,7 +685,7 @@ public class PCTRun extends PCT implements IRunAttributes {
                 }
             }
 
-            // Defines internal propath
+            // Define internal propath
             if (this.internalPropath != null) {
                 String[] lst = this.internalPropath.list();
                 for (int k = lst.length - 1; k >= 0; k--) {
@@ -672,7 +694,7 @@ public class PCTRun extends PCT implements IRunAttributes {
                 }
             }
 
-            // Defines PROPATH
+            // Define PROPATH
             if (runAttributes.getPropath() != null) {
                 // Bug #1058733 : multiple assignments for propath, as a long propath
                 // could lead to error 135 (More than xxx characters in a single
@@ -705,7 +727,7 @@ public class PCTRun extends PCT implements IRunAttributes {
                 bw.write(MessageFormat.format(getProgressProcedures().getCallbackString(), runAttributes.getMainCallback()));
             }
 
-            // Defines parameters
+            // Define parameters
             if (runAttributes.getRunParameters() != null) {
                 for (RunParameter param : runAttributes.getRunParameters()) {
                     if (param.validate()) {
@@ -718,7 +740,7 @@ public class PCTRun extends PCT implements IRunAttributes {
                 }
             }
 
-            // Defines variables for OUTPUT parameters
+            // Define variables for OUTPUT parameters
             if (runAttributes.getOutputParameters() != null) {
                 int zz = 0;
                 for (OutputParameter param : runAttributes.getOutputParameters()) {
@@ -728,7 +750,7 @@ public class PCTRun extends PCT implements IRunAttributes {
                 }
             }
 
-            // Creates a StringBuffer containing output parameters when calling the progress
+            // Create a StringBuffer containing output parameters when calling the progress
             // procedure
             StringBuilder sb = new StringBuilder();
             if ((runAttributes.getOutputParameters() != null) && !runAttributes.getOutputParameters().isEmpty()) {
@@ -747,21 +769,29 @@ public class PCTRun extends PCT implements IRunAttributes {
                 bw.write(getProgressProcedures().getSuperInitString());
             }
 
-            // Calls progress procedure
-            bw.write(MessageFormat.format(this.getProgressProcedures().getRunString(),
-                    escapeString(runAttributes.getProcedure()), sb.toString()));
-            // Checking return value
-            bw.write(this.getProgressProcedures().getAfterRun());
-            // Writing output parameters to temporary files
-            if (this.runAttributes.getOutputParameters() != null) {
-                for (OutputParameter param : runAttributes.getOutputParameters()) {
-                    File tmpFile = new File(
-                            System.getProperty(PCT.TMPDIR), param.getProgressVar() + "." + PCT.nextRandomInt() + ".out"); //$NON-NLS-1$ //$NON-NLS-2$ //$NON-NLS-3$
-                    param.setTempFileName(tmpFile);
-                    bw.write(MessageFormat.format(this.getProgressProcedures()
-                            .getOutputParameterCall(), param.getProgressVar(),
-                            escapeString(tmpFile.getAbsolutePath())));
+            // Call progress procedure
+            if ((runAttributes.getProcedure() != null)
+                    && !runAttributes.getProcedure().trim().isEmpty()) {
+                bw.write(MessageFormat.format(this.getProgressProcedures().getRunString(),
+                        escapeString(runAttributes.getProcedure()), sb.toString()));
+                // Check return value
+                bw.write(this.getProgressProcedures().getAfterRun());
+                // Write output parameters to temporary files
+                if (this.runAttributes.getOutputParameters() != null) {
+                    for (OutputParameter param : runAttributes.getOutputParameters()) {
+                        File tmpFile = new File(
+                                System.getProperty(PCT.TMPDIR), param.getProgressVar() + "." + PCT.nextRandomInt() + ".out"); //$NON-NLS-1$ //$NON-NLS-2$ //$NON-NLS-3$
+                        param.setTempFileName(tmpFile);
+                        bw.write(MessageFormat.format(this.getProgressProcedures()
+                                .getOutputParameterCall(), param.getProgressVar(),
+                                escapeString(tmpFile.getAbsolutePath())));
+                    }
                 }
+            } else {
+                bw.write(MessageFormat.format(this.getProgressProcedures().getDynamicInvokeString(),
+                        escapeString(runAttributes.getClassName())));
+                // Check return value
+                bw.write(this.getProgressProcedures().getAfterDynamicInvoke());
             }
             // Quit
             bw.write(this.getProgressProcedures().getQuit());
@@ -776,7 +806,7 @@ public class PCTRun extends PCT implements IRunAttributes {
     }
 
     protected void preparePropath() {
-        if (this.getIncludedPL()) {
+        if (useEmbeddedPL) {
             // PL is extracted later, we just have a reference on filename
             FileList list = new FileList();
             list.setDir(pctLib.getParentFile().getAbsoluteFile());
@@ -796,42 +826,6 @@ public class PCTRun extends PCT implements IRunAttributes {
                 return true;
         }
         return false;
-    }
-
-
-    /**
-     * Escapes a string so it does not accidentally contain Progress escape characters
-     * 
-     * @param str the input string
-     * @return the escaped string
-     */
-    protected static String escapeString(String str) {
-        if (str == null) {
-            return null;
-        }
-
-        int slen = str.length();
-        StringBuilder res = new StringBuilder();
-
-        for (int i = 0; i < slen; i++) {
-            char c = str.charAt(i);
-
-            switch (c) {
-                case '\u007E' : // TILDE converted to TILDE TILDE
-                    res.append("\u007E\u007E"); //$NON-NLS-1$
-                    break;
-
-                case '\u0022' : // QUOTATION MARK converted to TILDE APOSTROPHE
-                case '\''     : // APOSTROPHE converted to TILDE APOSTROPHE
-                    res.append("\u007E\u0027"); //$NON-NLS-1$
-                    break;
-
-                default :
-                    res.append(c);
-            }
-        }
-
-        return res.toString();
     }
 
     /**

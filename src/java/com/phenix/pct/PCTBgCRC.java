@@ -1,5 +1,5 @@
 /**
- * Copyright 2005-2022 Riverside Software
+ * Copyright 2005-2026 Riverside Software
  *
  *  Licensed under the Apache License, Version 2.0 (the "License");
  *  you may not use this file except in compliance with the License.
@@ -16,15 +16,14 @@
  */
 package com.phenix.pct;
 
-import org.apache.tools.ant.BuildException;
-
 import java.io.BufferedWriter;
 import java.io.File;
 import java.io.FileWriter;
 import java.io.IOException;
 import java.net.Socket;
 import java.util.List;
-import java.util.Map;
+
+import org.apache.tools.ant.BuildException;
 
 /**
  * Generates a file containing CRC for each table (multiple databases allowed)
@@ -50,7 +49,12 @@ public class PCTBgCRC extends PCTBgRun {
 
     @Override
     public void setProcedure(String procedure) {
-        throw new BuildException("Can't set procedure attribute");
+        throw new BuildException("Cannot set procedure attribute");
+    }
+
+    @Override
+    public void setClassName(String className) {
+        throw new BuildException("Cannot set className attribute");
     }
 
     public class CRCThreadStatus extends BackgroundWorker {
@@ -69,10 +73,6 @@ public class PCTBgCRC extends PCTBgRun {
                 setStatusQuit();
             }
             return false;
-        }
-
-        public void setCustomOptions(Map<String, String> options) {
-            // No-op
         }
 
         public void handleResponse(String command, String parameter, boolean err, String customResponse, List<Message> returnValues) {

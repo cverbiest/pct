@@ -1,5 +1,5 @@
 /**
- * Copyright 2005-2022 Riverside Software
+ * Copyright 2005-2026 Riverside Software
  *
  *  Licensed under the Apache License, Version 2.0 (the "License");
  *  you may not use this file except in compliance with the License.
@@ -28,6 +28,9 @@ import java.text.MessageFormat;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
 
 import org.apache.tools.ant.BuildException;
 import org.apache.tools.ant.taskdefs.ExecTask;
@@ -46,12 +49,15 @@ import com.phenix.pct.BackgroundWorker.Message;
  * @author <a href="mailto:g.querret+PCT@gmail.com">Gilles QUERRET</a>
  */
 public abstract class PCTBgRun extends PCT implements IRunAttributes {
+    private static final long DEFAULT_TIMEOUT = 30L * 60L; // 30 minutes
+
     protected Path internalPropath = null;
 
     // Attributes
     private int numThreads = 1;
     private GenericExecuteOptions options;
-    
+    private long timeout = DEFAULT_TIMEOUT;
+
     // Internal use : throw BuildException
     private boolean buildException;
     private Throwable buildExceptionSource;
@@ -70,7 +76,7 @@ public abstract class PCTBgRun extends PCT implements IRunAttributes {
         super();
 
         options = new GenericExecuteOptions(this);
-        options.setProcedure("pct/_server.p");
+        options.setProcedure("pct/server.p");
 
         // Nom de la PL à créer
         plID = PCT.nextRandomInt();
@@ -81,7 +87,7 @@ public abstract class PCTBgRun extends PCT implements IRunAttributes {
 
     protected void setRunAttributes(GenericExecuteOptions attrs) {
         this.options = attrs;
-        options.setProcedure("pct/_server.p");
+        options.setProcedure("pct/server.p");
     }
 
     /**
@@ -141,7 +147,7 @@ public abstract class PCTBgRun extends PCT implements IRunAttributes {
     }
 
     @Override
-    public void setParamFile(File pf) {
+    public void setParamFile(String pf) {
         options.setParamFile(pf);
     }
 
@@ -176,6 +182,16 @@ public abstract class PCTBgRun extends PCT implements IRunAttributes {
     }
 
     @Override
+    public void setClrnetcore(boolean clrnetcore) {
+        options.setClrnetcore(clrnetcore);
+    }
+
+    @Override
+    public void setCaseSensitiveClasses(boolean caseSensitive) {
+        options.setCaseSensitiveClasses(caseSensitive);
+    }
+
+    @Override
     public void setCompileUnderscore(boolean compUnderscore) {
         options.setCompileUnderscore(compUnderscore);
     }
@@ -191,7 +207,7 @@ public abstract class PCTBgRun extends PCT implements IRunAttributes {
     }
 
     @Override
-    public void setIniFile(File iniFile) {
+    public void setIniFile(String iniFile) {
         options.setIniFile(iniFile);
     }
 
@@ -338,6 +354,10 @@ public abstract class PCTBgRun extends PCT implements IRunAttributes {
         this.numThreads = numThreads;
     }
 
+    public void setTimeout(long timeout) {
+        this.timeout = timeout;
+    }
+
     public GenericExecuteOptions getOptions() {
         return options;
     }
@@ -391,6 +411,12 @@ public abstract class PCTBgRun extends PCT implements IRunAttributes {
      */
     @Override
     public void execute() {
+        if ((options.getProcedure() == null) || (options.getProcedure().length() == 0))
+            throw new BuildException("Procedure attribute not defined");
+        if ((options.getProcedure() != null) && !options.getProcedure().trim().isEmpty()
+                && (options.getClassName() != null) && !options.getClassName().trim().isEmpty())
+            throw new BuildException("Procedure and className attributes are mutually exclusive");
+
         ListenerThread listener = null;
         int port = 0;
         checkDlcHome();
@@ -431,8 +457,8 @@ public abstract class PCTBgRun extends PCT implements IRunAttributes {
         }
 
         try {
-            if (getIncludedPL() && !extractPL(pctLib)) {
-                throw new BuildException("Unable to extract pct.pl.");
+            if (!extractPL(pctLib)) {
+                throw new BuildException("Unable to extract pct.pl");
             }
         } catch (IOException caught) {
             cleanup();
@@ -466,7 +492,7 @@ public abstract class PCTBgRun extends PCT implements IRunAttributes {
      * according to cpstream, parameter files, ...) and dealing with OE encodings (such as undefined
      * or 1252)
      */
-    protected Charset getCharset() {
+    public Charset getCharset() {
         if (charset != null) {
             return charset;
         }
@@ -547,9 +573,8 @@ public abstract class PCTBgRun extends PCT implements IRunAttributes {
     private void createProfilerParamFile(File paramFile) {
         try (BufferedWriter bw = new BufferedWriter(new FileWriter(paramFile))) {
             // Assuming nobody will use file names with double quotes in this case...
-            bw.write("-FILENAME \""
-                    + new File(options.getProfiler().getOutputDir(), "profiler"
-                            + PCT.nextRandomInt() + ".out\""));
+            bw.write("-FILENAME \"" + new File(options.getProfiler().getOutputDir(), "profiler"
+                    + PCT.nextRandomInt() + options.getProfiler().getExtension() + "\""));
             bw.newLine();
             if (options.getProfiler().hasCoverage()) {
                 bw.write("-COVERAGE");
@@ -594,16 +619,14 @@ public abstract class PCTBgRun extends PCT implements IRunAttributes {
         return list;
     }
     protected void preparePropath() {
-        if (this.getIncludedPL()) {
-            // PL is extracted later, we just have a reference on filename
-            FileList list = new FileList();
-            list.setDir(pctLib.getParentFile().getAbsoluteFile());
-            FileList.FileName fn = new FileList.FileName();
-            fn.setName(pctLib.getName());
-            list.addConfiguredFile(fn);
-            this.internalPropath = new Path(this.getProject());
-            this.internalPropath.addFilelist(list);
-        }
+        // PL is extracted later, we just have a reference on filename
+        FileList list = new FileList();
+        list.setDir(pctLib.getParentFile().getAbsoluteFile());
+        FileList.FileName fn = new FileList.FileName();
+        fn.setName(pctLib.getName());
+        list.addConfiguredFile(fn);
+        this.internalPropath = new Path(this.getProject());
+        this.internalPropath.addFilelist(list);
     }
 
     protected void cleanup() {
@@ -650,50 +673,39 @@ public abstract class PCTBgRun extends PCT implements IRunAttributes {
          */
         @Override
         public void run() {
-            int acceptedThreads = 0;
-            int deadThreads = 0;
-            ThreadGroup group = new ThreadGroup("PCT");
-
-            while (acceptedThreads + deadThreads < numThreads) {
+            ExecutorService group = Executors.newFixedThreadPool(numThreads);
+            for (int zz = 0; zz < numThreads; zz++) {
+                final Socket socket;
                 try {
-                    final Socket socket = server.accept();
+                    socket = server.accept();
+                } catch (IOException caught) {
+                    setBuildException(caught);
+                    return;
+                }
+
+                group.execute(() -> {
                     final BackgroundWorker status = createOpenEdgeWorker(socket);
                     status.setDBConnections(options.getDBConnections().iterator());
                     status.setAliases(options.getAliases().iterator());
                     status.setPropath(getPropathAsList().iterator());
-                    status.setCustomOptions(null); // TODO
 
-                    Runnable r = new Runnable() {
-                        @Override
-                        public void run() {
-                            try {
-                                while (!status.quit) {
-                                    status.performAction();
-                                    status.listen();
-                                }
-                            } catch (IOException caught) {
-                                setBuildException(caught);
-                            }
+                    try {
+                        while (!status.quit) {
+                            status.performAction();
+                            status.listen();
                         }
-                    };
-                    new Thread(group, r).start();
-                    acceptedThreads++;
-                } catch (IOException caught) {
-                    // Thrown by accept(), so process didn't reach the listener
-                    deadThreads++;
-                    setBuildException(caught);
-                }
-            }
-            try {
-                synchronized (group) {
-                    while (group.activeCount() > 0) {
-                        group.wait();
+                    } catch (IOException caught) {
+                        setBuildException(caught);
                     }
-                }
+                });
+            }
+            group.shutdown();
+            try {
+                group.awaitTermination(timeout, TimeUnit.SECONDS);
             } catch (InterruptedException caught) {
                 setBuildException(caught);
+                Thread.currentThread().interrupt();
             }
-
         }
     }
 }

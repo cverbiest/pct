@@ -1,5 +1,5 @@
 /**
- * Copyright 2005-2022 Riverside Software
+ * Copyright 2005-2026 Riverside Software
  *
  *  Licensed under the Apache License, Version 2.0 (the "License");
  *  you may not use this file except in compliance with the License.
@@ -60,8 +60,12 @@ public class Sports2000 extends PCT {
      * @param overwrite "true|false|on|off|yes|no"
      */
     public void setOverwrite(boolean overwrite) {
-        log(Messages.getString("PCTCreateBase.1")); //$NON-NLS-1$
+        log(Messages.getString("PCTCreateDatabase.1")); //$NON-NLS-1$
         this.overwrite = overwrite;
+    }
+
+    String getDefaultDbName() {
+        return "sports2000";
     }
 
     /**
@@ -75,12 +79,12 @@ public class Sports2000 extends PCT {
 
         // If dbName is null, then it's sports2000
         if (dbName == null) {
-            dbName = "sports2000"; //$NON-NLS-1$
+            dbName = getDefaultDbName();
         }
 
         // Checking length of the database name
         if (dbName.length() > DB_NAME_MAX_LENGTH) {
-            throw new BuildException(Messages.getString("PCTCreateBase.4")); //$NON-NLS-1$
+            throw new BuildException(Messages.getString("PCTCreateDatabase.4")); //$NON-NLS-1$
         }
 
         // Update destDir if not defined
@@ -117,16 +121,16 @@ public class Sports2000 extends PCT {
         exec.setDir(destDir);
         exec.setExecutable(getExecPath("_dbutil").toString()); //$NON-NLS-1$
         exec.createArg().setValue("procopy"); //$NON-NLS-1$
-        exec.createArg().setValue(new File(getDlcHome(), "sports2000").getAbsolutePath()); //$NON-NLS-1$
+        exec.createArg().setValue(new File(getDlcHome(), getDefaultDbName()).getAbsolutePath()); //$NON-NLS-1$
         exec.createArg().setValue(dbName);
 
-        Environment.Variable var = new Environment.Variable();
-        var.setKey("DLC"); //$NON-NLS-1$
-        var.setValue(this.getDlcHome().toString());
-        exec.addEnv(var);
+        Environment.Variable envVar1 = new Environment.Variable();
+        envVar1.setKey("DLC"); //$NON-NLS-1$
+        envVar1.setValue(this.getDlcHome().toString());
+        exec.addEnv(envVar1);
 
-        for (Variable var2 : getEnvironmentVariables()) {
-            exec.addEnv(var2);
+        for (Variable envVar2 : getEnvironmentVariables()) {
+            exec.addEnv(envVar2);
         }
 
         return exec;

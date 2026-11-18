@@ -1,5 +1,5 @@
 /**
- * Copyright 2005-2019 Riverside Software
+ * Copyright 2005-2026 Riverside Software
  *
  *  Licensed under the Apache License, Version 2.0 (the "License");
  *  you may not use this file except in compliance with the License.
@@ -14,8 +14,8 @@
  *  limitations under the License.
  *
  */
- 
-PROCEDURE getCRC.
+
+PROCEDURE getCRC:
     DEFINE INPUT  PARAMETER cPrm  AS CHARACTER  NO-UNDO.
     DEFINE OUTPUT PARAMETER opOK  AS LOGICAL    NO-UNDO.
     DEFINE OUTPUT PARAMETER opMsg AS CHARACTER  NO-UNDO.
@@ -48,5 +48,5 @@ PROCEDURE getCRC.
         DELETE OBJECT h_File.
     END.
 
-    ASSIGN opOK = TRUE.    
+    ASSIGN opOK = TRUE.
 END PROCEDURE.

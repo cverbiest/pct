@@ -1,5 +1,5 @@
 /**
- * Copyright 2005-2022 Riverside Software
+ * Copyright 2005-2026 Riverside Software
  *
  *  Licensed under the Apache License, Version 2.0 (the "License");
  *  you may not use this file except in compliance with the License.
@@ -207,7 +207,9 @@ public abstract class BackgroundWorker {
      */
     protected abstract boolean performCustomAction() throws IOException;
 
-    public abstract void setCustomOptions(Map<String, String> options);
+    public void setCustomOptions(Map<String, String> options) {
+        // No-op
+    }
 
     /**
      * This is where you can handle responses from the Progress process
@@ -223,11 +225,11 @@ public abstract class BackgroundWorker {
 
     public final void handleStandardEventResponse(String command, String parameter, boolean err,
             String customResponse, List<Message> returnValues) {
+        parent.logMessages(returnValues);
         if ("connect".equalsIgnoreCase(command) && err) {
-            parent.logMessages(returnValues);
             parent.setBuildException(new BuildException(command + "(" + parameter + ") : " + customResponse));
             setStatusQuit();
-        }        
+        }
     }
 
     public static final class Message {

@@ -1,5 +1,5 @@
 /**
- * Copyright 2005-2019 Riverside Software
+ * Copyright 2005-2026 Riverside Software
  *
  *  Licensed under the Apache License, Version 2.0 (the "License");
  *  you may not use this file except in compliance with the License.
@@ -41,7 +41,7 @@ DO TRANSACTION ON ERROR UNDO, RETRY:
         MESSAGE "Unable to create _db record".
         RETURN '1'.
     END.
-    
+
     bDB:BUFFER-CREATE().
     ASSIGN bDB:BUFFER-FIELD('_Db-name'):BUFFER-VALUE      = shName
            bDB:BUFFER-FIELD('_Db-addr'):BUFFER-VALUE      = shName

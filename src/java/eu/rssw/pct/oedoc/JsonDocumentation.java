@@ -1,5 +1,5 @@
 /**
- * Copyright 2005-2022 Riverside Software
+ * Copyright 2005-2026 Riverside Software
  *
  *  Licensed under the Apache License, Version 2.0 (the "License");
  *  you may not use this file except in compliance with the License.
@@ -20,8 +20,11 @@ import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileWriter;
 import java.io.IOException;
+import java.io.InputStream;
+import java.io.UncheckedIOException;
 import java.io.Writer;
 import java.nio.charset.Charset;
+import java.nio.file.Files;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
@@ -30,7 +33,9 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Predicate;
+import java.util.stream.Stream;
 
+import org.antlr.v4.runtime.misc.ParseCancellationException;
 import org.apache.tools.ant.BuildException;
 import org.apache.tools.ant.Project;
 import org.apache.tools.ant.types.FileSet;
@@ -38,6 +43,7 @@ import org.apache.tools.ant.types.Path;
 import org.prorefactor.core.ABLNodeType;
 import org.prorefactor.core.JPNode;
 import org.prorefactor.core.ProToken;
+import org.prorefactor.core.nodetypes.IStatement;
 import org.prorefactor.core.schema.IDatabase;
 import org.prorefactor.core.schema.ISchema;
 import org.prorefactor.core.schema.Schema;
@@ -48,9 +54,6 @@ import org.prorefactor.treeparser.symbols.Routine;
 import org.prorefactor.treeparser.symbols.Variable;
 import org.sonar.plugins.openedge.api.objects.DatabaseWrapper;
 
-import com.google.common.base.Joiner;
-import com.google.common.base.Splitter;
-import com.google.common.io.Files;
 import com.google.gson.stream.JsonWriter;
 import com.phenix.pct.DBConnectionSet;
 import com.phenix.pct.PCT;
@@ -200,7 +203,7 @@ public class JsonDocumentation extends PCT {
         } catch (IOException caught) {
             throw new BuildException(caught);
         }
-        String pp = Joiner.on(',').join(propath.list());
+        String pp = String.join(",", propath.list());
         log("Using PROPATH: " + pp, Project.MSG_INFO);
         ProparseSettings ppSettings = new ProparseSettings(pp, false);
         RefactorSession session = new RefactorSession(ppSettings, sch, Charset.forName(encoding));
@@ -208,18 +211,21 @@ public class JsonDocumentation extends PCT {
         // Multi-threaded pool
         AtomicInteger numRCode = new AtomicInteger(0);
         ExecutorService service = Executors.newFixedThreadPool(numThreads);
-        Files.fileTraverser().depthFirstPreOrder(buildDir).forEach(f -> {
-            if (f.getName().endsWith(".r")) {
+        try (Stream<java.nio.file.Path> stream = Files.walk(buildDir.toPath())) {
+            stream.filter(path -> path.getFileName().toString().endsWith(".r")).forEach(f -> {
                 numRCode.incrementAndGet();
                 service.submit(() -> {
-                    ITypeInfo info = parseRCode(f);
+                    ITypeInfo info = parseRCode(f.toFile());
                     if (info != null) {
                         log("TypeInfo found: " + info.getTypeName(), Project.MSG_DEBUG);
                         session.injectTypeInfo(info);
                     }
                 });
-            }
-        });
+            });
+        } catch (IOException caught) {
+            log("Unable to parse build directory " + buildDir + " - " + caught.getMessage(),
+                    Project.MSG_ERR);
+        }
         service.shutdown();
         try {
             service.awaitTermination(10, TimeUnit.MINUTES);
@@ -236,20 +242,29 @@ public class JsonDocumentation extends PCT {
             for (FileSet fs : filesets) {
                 String[] dsfiles = fs.getDirectoryScanner(this.getProject()).getIncludedFiles();
                 for (int i = 0; i < dsfiles.length; i++) {
-                    File file = new File(fs.getDir(this.getProject()), dsfiles[i]);
-                    log("ProParse: " + dsfiles[i], Project.MSG_DEBUG);
-                    ParseUnit unit = new ParseUnit(file, dsfiles[i], session);
-                    unit.treeParser01();
-                    if (session.getTypeInfo(unit.getClassName()) != null) {
-                        writeClass(writer, session.getTypeInfo(unit.getClassName()), unit);
-                    } else {
-                        writeProcedure(dsfiles[i], writer, unit);
-                    }
+                    parseAndWriteUnit(new File(fs.getDir(this.getProject()), dsfiles[i]), session, writer);
                 }
             }
             writer.endArray();
         } catch (IOException caught) {
             throw new BuildException(caught);
+        }
+    }
+
+    private void parseAndWriteUnit(File file, RefactorSession session, JsonWriter writer)
+            throws IOException {
+        log("Proparse: " + file.getName(), Project.MSG_DEBUG);
+        try (InputStream input = new FileInputStream(file)) {
+            ParseUnit unit = new ParseUnit(input, file.getName(), session, session.getCharset());
+            unit.treeParser01();
+            if (session.getTypeInfo(unit.getClassName()) != null) {
+                writeClass(writer, session.getTypeInfo(unit.getClassName()), unit);
+            } else {
+                writeProcedure(file.getName(), writer, unit);
+            }
+        } catch (UncheckedIOException | ParseCancellationException caught) {
+            log("Unable to attach comments from " + file.getAbsolutePath() + " - Proparse error: "
+                    + caught.getMessage(), Project.MSG_INFO);
         }
     }
 
@@ -272,7 +287,9 @@ public class JsonDocumentation extends PCT {
         List<JPNode> lst = unit.getTopNode().queryStateHead(ABLNodeType.CLASS);
         if (!lst.isEmpty()) {
             useWidgetPool = !lst.get(0).queryCurrentStatement(ABLNodeType.USEWIDGETPOOL).isEmpty();
+            writeDeprecatedInfo(lst.get(0).asIStatement(), ofile);
         }
+        
         ofile.name("useWidgetPool").value(useWidgetPool);
         ofile.name("interfaces").beginArray();
         for (String str : info.getInterfaces()) {
@@ -314,6 +331,10 @@ public class JsonDocumentation extends PCT {
                             : prop.getVariable().getDataType().getPrimitive().getSignature());
             ofile.name("modifier").value(getModifier(prop));
             writeComments(ofile, getJavadoc(prop, unit));
+            Variable v = unit.getRootScope().lookupVariable(prop.getName());
+            if ((v != null) && (v.getDefineNode() != null)
+                    && v.getDefineNode().getStatement().isIStatement())
+                writeDeprecatedInfo(v.getDefineNode().getStatement().asIStatement(), ofile);
             ofile.endObject();
         }
         ofile.endArray();
@@ -346,7 +367,11 @@ public class JsonDocumentation extends PCT {
         ofile.name("extent").value(methd.getExtent());
         ofile.name("modifier").value(getModifier(methd));
 
-        List<String> comments = getJavadoc(methd, unit);
+        Routine routine = getRoutine(methd, unit);
+        List<String> comments = getJavadoc(routine, unit);
+        if ((routine != null) && (routine.getDefineNode() != null)
+                && routine.getDefineNode().isIStatement())
+            writeDeprecatedInfo(routine.getDefineNode().asIStatement(), ofile);
         writeComments(ofile, comments);
 
         ofile.name("parameters").beginArray();
@@ -426,20 +451,27 @@ public class JsonDocumentation extends PCT {
             return new ArrayList<>();
     }
 
-    private List<String> getJavadoc(IMethodElement elem, ParseUnit unit) {
+    private Routine getRoutine(IMethodElement elem, ParseUnit unit) {
         List<Routine> list = unit.getRootScope().lookupRoutines(elem.getName());
         if (list.isEmpty()) {
-            return new ArrayList<>();
+            return null;
         } else if (list.size() == 1) {
-            return getJavadoc(list.get(0).getDefineNode().getStatement());
+            return list.get(0);
         } else {
-            String sig = elem.getSignature();
+            String sig = elem.getSignature().substring(0, elem.getSignature().indexOf(')') + 1);
             for (Routine r : list) {
                 if (r.getSignature().equalsIgnoreCase(sig))
-                    return getJavadoc(r.getDefineNode().getStatement());
+                    return r;
             }
-            return new ArrayList<>();
+            return null;
         }
+    }
+
+    private List<String> getJavadoc(Routine routine, ParseUnit unit) {
+        if (routine == null)
+            return new ArrayList<>();
+        else
+            return getJavadoc(routine.getDefineNode().getStatement());
     }
 
     private List<String> getJavadoc(IPropertyElement elem, ParseUnit unit) {
@@ -448,6 +480,45 @@ public class JsonDocumentation extends PCT {
             return new ArrayList<>();
         else
             return getJavadoc(v.getDefineNode().getStatement());
+    }
+
+    private void writeDeprecatedInfo(IStatement stmt, JsonWriter writer) throws IOException {
+        List<String> annotations = stmt.getAnnotations();
+        if (annotations == null)
+            return;
+        for (String ann : annotations) {
+            if ("@deprecated".equalsIgnoreCase(ann)) {
+                writer.name("deprecated").beginObject().name("message").value("").endObject();
+                return;
+            } else if (ann.toLowerCase().startsWith("@deprecated(")) {
+                writer.name("deprecated").beginObject();
+                String since = "";
+                String message = "";
+                for (String str : ann.substring(ann.indexOf('(') + 1, ann.lastIndexOf(')'))
+                        .split(",")) {
+                    if ((str.indexOf('=') > -1) && "since"
+                            .equalsIgnoreCase(str.substring(0, str.indexOf('=')).trim())) {
+                        since = str.substring(str.indexOf('=') + 1).trim();
+                    } else if ((str.indexOf('=') > -1) && "message"
+                            .equalsIgnoreCase(str.substring(0, str.indexOf('=')).trim())) {
+                        message = str.substring(str.indexOf('=') + 1).trim();
+                    }
+                }
+                writer.name("message").value(dequote(message.trim()));
+                if (!since.trim().isEmpty())
+                    writer.name("since").value(dequote(since.trim()));
+                writer.endObject();
+                return;
+            }
+        }
+    }
+
+    private String dequote(String str) {
+        if ((str.length() > 1) && (str.charAt(0) == '\'') && (str.charAt(str.length() - 1) == '\''))
+            return str.substring(1, str.length() - 1);
+        if ((str.length() > 1) && (str.charAt(0) == '"') && (str.charAt(str.length() - 1) == '"'))
+            return str.substring(1, str.length() - 1);
+        return str;
     }
 
     private List<String> getJavadoc(JPNode stmt) {
@@ -480,18 +551,35 @@ public class JsonDocumentation extends PCT {
     private List<String> convertJavadoc(String comment) {
         List<String> rslt = new ArrayList<>();
         if (checkStartComment(comment.trim())) {
-            for (String s : Splitter.on('\n').split(comment.trim())) {
-                // First line and last line is not supposed to contain anything
-                if (!checkStartComment(s.trim()) && !s.endsWith("*/")) {
-                    // Trim first *
-                    if (s.trim().startsWith("*"))
-                        rslt.add(s.trim().substring(1).trim());
-                    else
-                        rslt.add(s.trim());
+            for (String line : comment.trim().split("\n")) {
+                boolean skipEmptyLine = false;
+                line = line.trim();
+                if (line.endsWith("*/")) {
+                    line = line.substring(0, line.length() - 2).trim();
+                    skipEmptyLine = true;
                 }
+                if (checkStartComment(line)) {
+                    line = trimStartComment(line);
+                    skipEmptyLine = true;
+                }
+                if (line.startsWith("*"))
+                    line = line.substring(1).trim();
+                if (!skipEmptyLine || !line.isEmpty())
+                    rslt.add(line);
             }
         }
         return rslt;
+    }
+
+    private String trimStartComment(String comment) {
+        if ((style == CommentStyle.JAVADOC) && comment.startsWith("/**"))
+            return comment.substring(3).trim();
+        else if ((style == CommentStyle.SIMPLE) && comment.startsWith("/*"))
+            return comment.substring(2).trim();
+        else if ((style == CommentStyle.CONSULTINGWERK) && comment.startsWith("/**"))
+            return comment.substring(3).trim();
+        else
+            return comment;
     }
 
     private boolean checkStartComment(String comment) {

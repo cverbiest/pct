@@ -1,5 +1,5 @@
 /**
- * Copyright 2005-2019 Riverside Software
+ * Copyright 2005-2026 Riverside Software
  *
  *  Licensed under the Apache License, Version 2.0 (the "License");
  *  you may not use this file except in compliance with the License.
@@ -16,10 +16,11 @@
  */
 
 /* Callbacks are only supported on 11.3+ */
- &IF DECIMAL(SUBSTRING(PROVERSION, 1, INDEX(PROVERSION, '.') + 1)) GE 11.3 &THEN
- USING Progress.Lang.Class.
- &ENDIF
- USING Progress.Json.ObjectModel.*.
+&IF DECIMAL(SUBSTRING(PROVERSION, 1, INDEX(PROVERSION, '.') + 1)) GE 11.3 &THEN
+USING Progress.Lang.Class.
+&ENDIF
+USING Progress.Json.ObjectModel.JsonArray.
+USING Progress.Json.ObjectModel.JsonObject.
 
 &IF INTEGER(SUBSTRING(PROVERSION, 1, INDEX(PROVERSION, '.'))) GE 11 &THEN
   { pct/v11/xrefd0005.i}
@@ -82,10 +83,9 @@ DEFINE TEMP-TABLE ttProjectErrors NO-UNDO
   FIELD colNum   AS INTEGER
   FIELD msg      AS CHARACTER.
 
-DEFINE SHARED VARIABLE pctVerbose AS LOGICAL NO-UNDO.
-
 FUNCTION getTimeStampDF RETURN DATETIME (INPUT d AS CHARACTER, INPUT f AS CHARACTER) FORWARD.
 FUNCTION getTimeStampF RETURN DATETIME (INPUT f AS CHARACTER) FORWARD.
+FUNCTION checkMissingPctFiles RETURNS LOGICAL (INPUT f AS CHARACTER, INPUT ts AS DATETIME, INPUT d AS CHARACTER) FORWARD.
 FUNCTION CheckIncludes RETURNS LOGICAL (INPUT f AS CHARACTER, INPUT ts AS DATETIME, INPUT d AS CHARACTER) FORWARD.
 FUNCTION CheckCRC RETURNS LOGICAL (INPUT f AS CHARACTER, INPUT d AS CHARACTER) FORWARD.
 FUNCTION CheckHierarchy RETURNS LOGICAL (INPUT f AS CHARACTER, INPUT ts AS DATETIME, INPUT d AS CHARACTER) FORWARD.
@@ -108,24 +108,24 @@ DEFINE VARIABLE preprocessDir AS CHARACTER  NO-UNDO.
 DEFINE VARIABLE dbgListDir AS CHARACTER NO-UNDO.
 DEFINE VARIABLE flattenDbg AS LOGICAL   NO-UNDO.
 DEFINE VARIABLE ForceComp AS LOGICAL    NO-UNDO.
-DEFINE VARIABLE NoParse   AS LOGICAL    NO-UNDO INITIAL FALSE.
-DEFINE VARIABLE StrXref   AS LOGICAL    NO-UNDO INITIAL FALSE.
-DEFINE VARIABLE AppStrXrf AS LOGICAL    NO-UNDO INITIAL FALSE.
-DEFINE VARIABLE RunList   AS LOGICAL    NO-UNDO INITIAL FALSE.
-DEFINE VARIABLE Lst       AS LOGICAL    NO-UNDO INITIAL FALSE.
-DEFINE VARIABLE LstPrepro AS LOGICAL    NO-UNDO INITIAL FALSE.
-DEFINE VARIABLE PrePro    AS LOGICAL    NO-UNDO INITIAL FALSE.
-DEFINE VARIABLE DebugLst  AS LOGICAL    NO-UNDO INITIAL FALSE.
-DEFINE VARIABLE keepXref  AS LOGICAL    NO-UNDO INITIAL FALSE.
-DEFINE VARIABLE multiComp AS LOGICAL    NO-UNDO INITIAL FALSE.
-DEFINE VARIABLE lXmlXref  AS LOGICAL    NO-UNDO INITIAL FALSE.
+DEFINE VARIABLE NoParse   AS LOGICAL    NO-UNDO.
+DEFINE VARIABLE StrXref   AS LOGICAL    NO-UNDO.
+DEFINE VARIABLE AppStrXrf AS LOGICAL    NO-UNDO.
+DEFINE VARIABLE RunList   AS LOGICAL    NO-UNDO.
+DEFINE VARIABLE Lst       AS LOGICAL    NO-UNDO.
+DEFINE VARIABLE LstPrepro AS LOGICAL    NO-UNDO.
+DEFINE VARIABLE PrePro    AS LOGICAL    NO-UNDO.
+DEFINE VARIABLE DebugLst  AS LOGICAL    NO-UNDO.
+DEFINE VARIABLE keepXref  AS LOGICAL    NO-UNDO.
+DEFINE VARIABLE multiComp AS LOGICAL    NO-UNDO.
+DEFINE VARIABLE lXmlXref  AS LOGICAL    NO-UNDO.
 DEFINE VARIABLE lXCode    AS LOGICAL    NO-UNDO.
-DEFINE VARIABLE lRelative AS LOGICAL    NO-UNDO INITIAL FALSE.
-DEFINE VARIABLE ProgPerc  AS INTEGER    NO-UNDO INITIAL 0.
-DEFINE VARIABLE lOptFullKw AS LOGICAL   NO-UNDO INITIAL FALSE.
-DEFINE VARIABLE lOptFldQlf AS LOGICAL   NO-UNDO INITIAL FALSE.
-DEFINE VARIABLE lOptFullNames AS LOGICAL NO-UNDO INITIAL FALSE.
-DEFINE VARIABLE lOptRetVals AS LOGICAL  NO-UNDO INITIAL FALSE.
+DEFINE VARIABLE lRelative AS LOGICAL    NO-UNDO.
+DEFINE VARIABLE ProgPerc  AS INTEGER    NO-UNDO.
+DEFINE VARIABLE lOptFullKw AS LOGICAL   NO-UNDO.
+DEFINE VARIABLE lOptFldQlf AS LOGICAL   NO-UNDO.
+DEFINE VARIABLE lOptFullNames AS LOGICAL NO-UNDO.
+DEFINE VARIABLE lOptRetVals AS LOGICAL  NO-UNDO.
 DEFINE VARIABLE cOpts     AS CHARACTER NO-UNDO.
 DEFINE VARIABLE iLine     AS INTEGER    NO-UNDO.
 DEFINE VARIABLE iTotlines AS INTEGER    NO-UNDO.
@@ -135,13 +135,13 @@ DEFINE VARIABLE iStepPerc AS INTEGER    NO-UNDO.
 DEFINE VARIABLE cDspSteps AS CHARACTER  NO-UNDO.
 DEFINE VARIABLE cIgnoredIncludes AS CHARACTER  NO-UNDO.
 DEFINE VARIABLE lIgnoredIncludes AS LOGICAL    NO-UNDO.
-DEFINE VARIABLE iFileList AS INTEGER    NO-UNDO.
+DEFINE VARIABLE iFileList AS INTEGER    NO-UNDO. /* DisplayFiles value */
 DEFINE VARIABLE callbackClass AS CHARACTER NO-UNDO.
 DEFINE VARIABLE outputType AS CHARACTER NO-UNDO.
 DEFINE VARIABLE cLastIncludeName AS CHARACTER NO-UNDO.
 
-DEFINE VARIABLE lOutputJson    AS LOGICAL NO-UNDO INITIAL FALSE.
-DEFINE VARIABLE lOutputConsole AS LOGICAL NO-UNDO INITIAL FALSE.
+DEFINE VARIABLE lOutputJson    AS LOGICAL NO-UNDO.
+DEFINE VARIABLE lOutputConsole AS LOGICAL NO-UNDO.
 
 /* Handle to calling procedure in order to log messages */
 DEFINE VARIABLE hSrcProc AS HANDLE NO-UNDO.
@@ -149,9 +149,9 @@ ASSIGN hSrcProc = SOURCE-PROCEDURE.
 
 DEFINE VARIABLE majorMinor AS DECIMAL NO-UNDO.
 DEFINE VARIABLE bAboveEq113 AS LOGICAL NO-UNDO INITIAL TRUE.
-DEFINE VARIABLE bAboveEq117 AS LOGICAL NO-UNDO INITIAL FALSE.
-DEFINE VARIABLE bAboveEq1173 AS LOGICAL NO-UNDO INITIAL FALSE.
-DEFINE VARIABLE bAboveEq12 AS LOGICAL NO-UNDO INITIAL FALSE.
+DEFINE VARIABLE bAboveEq117 AS LOGICAL NO-UNDO.
+DEFINE VARIABLE bAboveEq1173 AS LOGICAL NO-UNDO.
+DEFINE VARIABLE bAboveEq12 AS LOGICAL NO-UNDO.
 
 ASSIGN majorMinor = DECIMAL(REPLACE(SUBSTRING(PROVERSION, 1, INDEX(PROVERSION, '.') + 1), '.', SESSION:NUMERIC-DECIMAL-POINT)).
 ASSIGN bAboveEq113 = (majorMinor GE 11.3).
@@ -169,12 +169,12 @@ DEFINE VARIABLE compileAction AS INTEGER NO-UNDO.
 ASSIGN compileAction = 0.
 &ENDIF
 
-PROCEDURE setOption.
+PROCEDURE setOption:
   DEFINE INPUT PARAMETER ipName  AS CHARACTER NO-UNDO.
   DEFINE INPUT PARAMETER ipValue AS CHARACTER NO-UNDO.
 
   CASE ipName:
-    when 'OUTPUTDIR':U        THEN ASSIGN DestDir = ipValue.
+    WHEN 'OUTPUTDIR':U        THEN ASSIGN DestDir = ipValue.
     WHEN 'PCTDIR':U           THEN ASSIGN PCTDir = ipValue.
     WHEN 'FORCECOMPILE':U     THEN ASSIGN ForceComp = (ipValue EQ '1':U).
     WHEN 'XCODE':U            THEN ASSIGN lXCode = (ipValue EQ '1':U).
@@ -214,13 +214,33 @@ PROCEDURE initModule:
 
   IF (callbackClass > "") AND NOT bAboveEq113 THEN
     MESSAGE "Callbacks are only supported on 11.3+".
+
   /* Callbacks are only supported on 11.3+ */
 &IF DECIMAL(SUBSTRING(PROVERSION, 1, INDEX(PROVERSION, '.') + 1)) GE 11.3 &THEN
-  IF (callbackClass > "") THEN DO:
-      callback = CAST(Class:GetClass(callbackClass):new(), rssw.pct.ICompileCallback).
-      callback:initialize(hSrcProc).
+  IF (callbackClass > "") THEN DO ON ERROR UNDO, LEAVE:
+    /* First attempt to get the named class, or fail silently. */
+    DEFINE VARIABLE oClass AS Progress.Lang.Class NO-UNDO.
+    oClass = Progress.Lang.Class:GetClass(callbackClass) NO-ERROR.
+    IF ERROR-STATUS:ERROR THEN DO:
+      MESSAGE "GetClass Error: " ERROR-STATUS:GET-MESSAGE(1).
+      ERROR-STATUS:ERROR = false.
+    END.
+    ELSE DO:
+      /* Confirm the callback implements the expected interface. */
+      IF VALID-OBJECT(oClass) AND oClass:IsA(get-class(rssw.pct.ICompileCallback)) THEN
+        callback = CAST(oClass:new(), rssw.pct.ICompileCallback) NO-ERROR.
+      ELSE
+        MESSAGE "Skip '" + callbackClass + "' callback as it doesn't implement rssw.pct.ICompileCallback".
+
+      IF VALID-OBJECT(callback) AND VALID-OBJECT(hSrcProc) THEN
+        callback:initialize(hSrcProc).
+    END.
+    CATCH err AS Progress.Lang.Error:
+      MESSAGE "Error while creating callback class: " err:GetMessage(1).
+    END CATCH.
   END.
 &ENDIF
+
   IF (outputType > "") THEN DO:
     IF (LOOKUP("json", outputType) GT 0) THEN DO:
       IF bAboveEq117 THEN DO:
@@ -243,7 +263,7 @@ PROCEDURE initModule:
     RETURN RETURN-VALUE.
 
   /* Checks if valid config */
-  OutputDir = if DestDir ne ? then DestDir else ".".
+  OutputDir = IF DestDir NE ? THEN DestDir ELSE ".".
   IF NOT FileExists(OutputDir) THEN
     RETURN '4'.
   IF NOT FileExists(PCTDir) THEN
@@ -287,19 +307,20 @@ FUNCTION getRecompileLabel RETURNS CHARACTER (ipVal AS INTEGER):
     WHEN 0 THEN RETURN 'Up to date'.
     WHEN 1 THEN RETURN 'No r-code'.
     WHEN 2 THEN RETURN 'R-code older than source'.
-    WHEN 3 THEN RETURN 'R-code older than include file'.
+    WHEN 3 THEN RETURN 'R-code older than include file, or include reference pointing to different file'.
     WHEN 4 THEN RETURN 'Table CRC'.
     WHEN 5 THEN RETURN 'XCode or force'.
     WHEN 6 THEN RETURN 'Hierarchy change'.
+    WHEN 7 THEN RETURN 'Missing .inc or .crc'.
     OTHERWISE   RETURN '???'.
   END.
 END FUNCTION.
 
-PROCEDURE compileXref.
+PROCEDURE compileXref:
   DEFINE INPUT  PARAMETER ipInDir   AS CHARACTER  NO-UNDO. /* Fileset. Never null */
   DEFINE INPUT  PARAMETER ipInFile  AS CHARACTER  NO-UNDO. /* Path relative to fileset. Never null */
   DEFINE INPUT  PARAMETER ipOutFile AS CHARACTER  NO-UNDO. /* Path relative to pcOutDir. Can be null, in this case, the default rcode name */
-  DEFINE OUTPUT PARAMETER opError   AS LOGICAL    NO-UNDO INITIAL FALSE.
+  DEFINE OUTPUT PARAMETER opError   AS LOGICAL    NO-UNDO.
   DEFINE OUTPUT PARAMETER opComp    AS INTEGER    NO-UNDO. /* 0 -> Not compiled, >0  recompiled */
 
   DEFINE VARIABLE i        AS INTEGER    NO-UNDO.
@@ -316,9 +337,9 @@ PROCEDURE compileXref.
   DEFINE VARIABLE warningsFile AS CHARACTER NO-UNDO.
   DEFINE VARIABLE RCodeTS   AS DATETIME   NO-UNDO.
   DEFINE VARIABLE ProcTS    AS DATETIME   NO-UNDO.
-  DEFINE VARIABLE cRenameFrom AS CHARACTER NO-UNDO INITIAL ''.
-  DEFINE VARIABLE lWarnings AS LOGICAL NO-UNDO INITIAL FALSE.
-  DEFINE VARIABLE lOneWarning AS LOGICAL NO-UNDO INITIAL FALSE.
+  DEFINE VARIABLE cRenameFrom AS CHARACTER NO-UNDO.
+  DEFINE VARIABLE lWarnings AS LOGICAL NO-UNDO.
+  DEFINE VARIABLE lOneWarning AS LOGICAL NO-UNDO.
 
   EMPTY TEMP-TABLE ttWarnings. /* Emptying the temp-table to store warnings for current file*/
   /* Output progress */
@@ -355,6 +376,10 @@ PROCEDURE compileXref.
                        ELSE (IF cFileExt = ".cls":U OR lRelative
                                THEN outputDir
                                ELSE outputDir + '/':U + cBase)).
+  IF (cFileExt = ".cls") AND (cSaveDir EQ ipInDir) THEN DO:
+    // Don't specify saveDir attribute when compiling classes with destDir pointing to target directory (see issue #556)
+    ASSIGN cSaveDir = ''.
+  END.
 
   IF (ipOutFile EQ ?) OR (ipOutFile EQ '') THEN DO:
     ASSIGN ipOutFile = SUBSTRING(ipInFile, 1, R-INDEX(ipInFile, cFileExt) - 1) + '.r':U.
@@ -365,7 +390,7 @@ PROCEDURE compileXref.
     IF (opError) THEN RETURN.
     ASSIGN opError = NOT createDir(PCTDir, cBase2).
     IF (opError) THEN RETURN.
-    ASSIGN cRenameFrom = cBase + (IF cbase EQ '' THEN '' ELSE '/') + substring(cfile, 1, R-INDEX(cfile, '.') - 1) + '.r'.
+    ASSIGN cRenameFrom = cBase + (IF cbase EQ '' THEN '' ELSE '/') + SUBSTRING(cfile, 1, R-INDEX(cfile, '.') - 1) + '.r'.
   END.
 
   IF (noParse OR ForceComp OR lXCode) THEN DO:
@@ -374,9 +399,9 @@ PROCEDURE compileXref.
   ELSE DO:
     /* Does .r file exists ?,
        if DestDir = unknown rcode will be located in the same directory as the source : ipInDir */
-    ASSIGN RCodeTS = getTimeStampDF(if DestDir = ? then ipInDir else OutputDir, ipOutFile).
+    ASSIGN RCodeTS = getTimeStampDF(IF DestDir = ? THEN ipInDir ELSE OutputDir, ipOutFile).
     IF (RCodeTS EQ ?) THEN DO:
-      opComp = 1.
+      opComp = 1. /* No rcode */
     END.
     ELSE DO:
       /* Checking if .r timestamp is prior to procedure timestamp */
@@ -385,16 +410,21 @@ PROCEDURE compileXref.
         opComp = 2.
       END.
       ELSE DO:
-        IF CheckIncludes(ipInFile, RCodeTS, PCTDir) THEN DO:
-          opComp = 3.
+        IF checkMissingPCTFiles(ipInFile, RCodeTS, PCTDir) THEN DO:
+          opComp = 7. /* Missing PCT files */
         END.
         ELSE DO:
-          IF CheckCRC(ipInFile, PCTDir) THEN DO:
-            opComp = 4.
+          IF CheckIncludes(ipInFile, RCodeTS, PCTDir) THEN DO:
+            opComp = 3. /* R-code older than include file */
           END.
           ELSE DO:
-            IF CheckHierarchy(ipInFile, RCodeTS, PCTDir) THEN DO:
-              opComp = 6.
+            IF CheckCRC(ipInFile, PCTDir) THEN DO:
+              opComp = 4. /* Table CRC */
+            END.
+            ELSE DO:
+              IF CheckHierarchy(ipInFile, RCodeTS, PCTDir) THEN DO:
+                opComp = 6. /* Hierarchy change */
+              END.
             END.
           END.
         END.
@@ -518,9 +548,9 @@ PROCEDURE compileXref.
           CREATE ttProjectWarnings.
           ASSIGN ttProjectWarnings.msgNum       = ttWarnings.msgNum
                  ttProjectWarnings.rowNum       = ttWarnings.rowNum
-                 ttProjectWarnings.fileName     = REPLACE(ttWarnings.fileName, chr(92), '/')
+                 ttProjectWarnings.fileName     = REPLACE(ttWarnings.fileName, CHR(92), '/')
                  ttProjectWarnings.msg          = ttWarnings.msg
-                 ttProjectWarnings.mainFileName = REPLACE(ipInDir + (if ipInDir eq '':U then '':U else '/':U) + ipInFile, chr(92), '/').
+                 ttProjectWarnings.mainFileName = REPLACE(ipInDir + (IF ipInDir EQ '':U THEN '':U ELSE '/':U) + ipInFile, CHR(92), '/').
         END.
       END.
       IF lOutputConsole THEN DO:
@@ -557,8 +587,8 @@ PROCEDURE compileXref.
     IF lOutputJson THEN DO:
       FOR EACH ttErrors:
         CREATE ttProjectErrors.
-        ASSIGN ttProjectErrors.fileName      = REPLACE(ttErrors.fileName, chr(92), '/')
-               ttProjectErrors.mainFileName  = REPLACE(ipInDir + (if ipInDir eq '':U then '':U else '/':U) + ipInFile, chr(92), '/')
+        ASSIGN ttProjectErrors.fileName      = REPLACE(ttErrors.fileName, CHR(92), '/')
+               ttProjectErrors.mainFileName  = REPLACE(ipInDir + (IF ipInDir EQ '':U THEN '':U ELSE '/':U) + ipInFile, CHR(92), '/')
                ttProjectErrors.rowNum        = ttErrors.rowNum
                ttProjectErrors.colNum        = ttErrors.colNum
                ttProjectErrors.msg           = ttErrors.msg.
@@ -583,7 +613,7 @@ PROCEDURE compileXref.
 
 END PROCEDURE.
 
-PROCEDURE printErrorsWarningsJson.
+PROCEDURE printErrorsWarningsJson:
 
   DEFINE INPUT PARAMETER iCompOK AS INTEGER NO-UNDO.
   DEFINE INPUT PARAMETER iCompFail AS INTEGER NO-UNDO.
@@ -663,7 +693,7 @@ PROCEDURE displayCompileErrors PRIVATE:
 
 END PROCEDURE.
 
-PROCEDURE importXmlXref.
+PROCEDURE importXmlXref:
   DEFINE INPUT  PARAMETER pcXref AS CHARACTER NO-UNDO.
   DEFINE INPUT  PARAMETER pcDir  AS CHARACTER NO-UNDO.
   DEFINE INPUT  PARAMETER pcFile AS CHARACTER NO-UNDO.
@@ -764,7 +794,7 @@ PROCEDURE importXmlXref.
 
 END PROCEDURE.
 
-PROCEDURE importXref PRIVATE.
+PROCEDURE importXref PRIVATE:
   DEFINE INPUT  PARAMETER pcXref AS CHARACTER NO-UNDO.
   DEFINE INPUT  PARAMETER pcDir  AS CHARACTER NO-UNDO.
   DEFINE INPUT  PARAMETER pcFile AS CHARACTER NO-UNDO.
@@ -917,16 +947,24 @@ FUNCTION getTimeStampF RETURNS DATETIME (INPUT f AS CHARACTER):
   RETURN DATETIME(FILE-INFO:FILE-MOD-DATE, FILE-INFO:FILE-MOD-TIME * 1000).
 END FUNCTION.
 
+FUNCTION checkMissingPctFiles RETURNS LOGICAL (INPUT f AS CHARACTER, INPUT ts AS DATETIME, INPUT d AS CHARACTER):
+  IF NOT fileExists(d + '/':U + f + '.inc':U) THEN
+    RETURN TRUE.
+  IF NOT fileExists(d + '/':U + f + '.crc':U) THEN
+    RETURN TRUE.
+  RETURN FALSE.
+END FUNCTION.
+
 FUNCTION CheckIncludes RETURNS LOGICAL (INPUT f AS CHARACTER, INPUT ts AS DATETIME, INPUT d AS CHARACTER):
   DEFINE VARIABLE IncFile     AS CHARACTER  NO-UNDO.
   DEFINE VARIABLE IncFullPath AS CHARACTER  NO-UNDO.
-  DEFINE VARIABLE lReturn     AS LOGICAL    NO-UNDO INITIAL FALSE.
+  DEFINE VARIABLE lReturn     AS LOGICAL    NO-UNDO.
 
-  /* Small workaround when compiling classes */
+  DEFINE BUFFER TimeStamps FOR TimeStamps.
+
   FILE-INFO:FILE-NAME = d + '/':U + f + '.inc':U.
-  IF FILE-INFO:FULL-PATHNAME EQ ? THEN DO:
-    RETURN lReturn.
-  END.
+  IF FILE-INFO:FULL-PATHNAME EQ ? THEN
+    RETURN FALSE.
 
   INPUT STREAM sIncludes FROM VALUE (d + '/':U + f + '.inc':U).
   FileList:
@@ -957,10 +995,12 @@ END FUNCTION.
 FUNCTION CheckCRC RETURNS LOGICAL (INPUT f AS CHARACTER, INPUT d AS CHARACTER):
   DEFINE VARIABLE cTab AS CHARACTER  NO-UNDO.
   DEFINE VARIABLE cCRC AS CHARACTER  NO-UNDO.
-  DEFINE VARIABLE lRet AS LOGICAL    NO-UNDO INITIAL FALSE.
+  DEFINE VARIABLE lRet AS LOGICAL    NO-UNDO.
 
-  IF NOT fileExists(d + '/':U + f + '.crc':U) THEN
-    RETURN TRUE.
+  FILE-INFO:FILE-NAME = d + '/':U + f + '.crc':U.
+  IF FILE-INFO:FULL-PATHNAME EQ ? THEN
+    RETURN FALSE.
+
   INPUT STREAM sCRC FROM VALUE(d + '/':U + f + '.crc':U).
   CRCList:
   REPEAT:
@@ -983,13 +1023,13 @@ END FUNCTION.
 FUNCTION checkHierarchy RETURNS LOGICAL (INPUT f AS CHARACTER, INPUT ts AS DATETIME, INPUT d AS CHARACTER):
   DEFINE VARIABLE clsName     AS CHARACTER  NO-UNDO.
   DEFINE VARIABLE clsFullPath AS CHARACTER  NO-UNDO.
-  DEFINE VARIABLE lReturn     AS LOGICAL    NO-UNDO INITIAL FALSE.
+  DEFINE VARIABLE lReturn     AS LOGICAL    NO-UNDO.
 
-  /* Small workaround when compiling classes */
+  DEFINE BUFFER TimeStamps FOR TimeStamps.
+
   FILE-INFO:FILE-NAME = d + '/':U + f + '.hierarchy':U.
-  IF FILE-INFO:FULL-PATHNAME EQ ? THEN DO:
-    RETURN lReturn.
-  END.
+  IF FILE-INFO:FULL-PATHNAME EQ ? THEN
+    RETURN FALSE.
 
   INPUT STREAM sHierarchy FROM VALUE (d + '/':U + f + '.hierarchy':U).
   FileList:

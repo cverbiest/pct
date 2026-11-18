@@ -1,5 +1,5 @@
 /**
- * Copyright 2005-2022 Riverside Software
+ * Copyright 2005-2026 Riverside Software
  *
  *  Licensed under the Apache License, Version 2.0 (the "License");
  *  you may not use this file except in compliance with the License.
@@ -16,13 +16,7 @@
  */
 package com.phenix.pct;
 
-import java.io.BufferedWriter;
 import java.io.File;
-import java.io.FileOutputStream;
-import java.io.IOException;
-import java.io.OutputStream;
-import java.io.OutputStreamWriter;
-import java.io.Writer;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -31,26 +25,18 @@ import org.apache.tools.ant.taskdefs.ExecTask;
 import org.apache.tools.ant.types.Environment;
 
 /**
- * Class for creating Progress databases
+ * IndexRebuild task
  * 
  * @author <a href="mailto:g.querret+PCT@gmail.com">Gilles QUERRET </a>
  */
 public class PCTIndexRebuild extends PCT {
     private File dbDir = null;
     private String dbName = null;
+    private String passphraseCmdLine = null;
     private File outputLog = null;
     private List<IndexNode> indexes = new ArrayList<>();
     private String cpInternal = null;
     private List<PCTRunOption> options = new ArrayList<>();
-
-    // Internal use
-    private int tmpId;
-    private File tmpFile;
-
-    public PCTIndexRebuild() {
-        tmpId = PCT.nextRandomInt();
-        tmpFile = new File(System.getProperty(PCT.TMPDIR), "idxbuild" + tmpId + ".txt");
-    }
 
     /**
      * Database name
@@ -69,7 +55,11 @@ public class PCTIndexRebuild extends PCT {
     public void setOutputLog(File outputLog) {
         this.outputLog = outputLog;
     }
-    
+
+    public void setPassphraseCmdLine(String passphraseCmdLine) {
+        this.passphraseCmdLine = passphraseCmdLine;
+    }
+
     /**
      * Internal code page (-cpinternal attribute)
      */
@@ -89,7 +79,6 @@ public class PCTIndexRebuild extends PCT {
         options.add(option);
     }
 
-    
     /**
      * Do the work
      * 
@@ -101,28 +90,17 @@ public class PCTIndexRebuild extends PCT {
 
         // Checking dbName and dbDir are defined
         if (dbName == null) {
-            throw new BuildException(Messages.getString("PCTCreateBase.3"));
+            throw new BuildException(Messages.getString("PCTCreateDatabase.3"));
         }
         if (indexes.isEmpty())
-            throw new BuildException("Index list can't be empty");
+            throw new BuildException("Index list cannot be empty");
 
         // Update dbDir if not defined
         if (dbDir == null) {
             dbDir = getProject().getBaseDir();
         }
 
-        try {
-            generateIndexFile();
-            idxBuildCmdLine().execute();
-        } catch (IOException caught) {
-            throw new BuildException(caught);
-        } finally {
-            cleanup();
-        }
-    }
-
-    protected void cleanup() {
-        deleteFile(tmpFile);
+        idxBuildCmdLine().execute();
     }
 
     public static class IndexNode {
@@ -137,26 +115,18 @@ public class PCTIndexRebuild extends PCT {
             this.index = index;
         }
     }
-    
-    private void generateIndexFile() throws IOException {
-        try (OutputStream os = new FileOutputStream(tmpFile);
-                Writer w = new OutputStreamWriter(os);
-                BufferedWriter bw = new BufferedWriter(w)) {
-            bw.write("some");
-            bw.newLine();
-            for (IndexNode idx : indexes) {
-                bw.write(idx.table);
-                bw.newLine();
-                bw.write(idx.index);
-                bw.newLine();
-            }
-            bw.write("!");
-            bw.newLine();
-            bw.write("y");
-            bw.newLine();
-            bw.write("y");
-            bw.newLine();
-        }  
+
+    private String generateInputString() {
+        StringBuilder sb = new StringBuilder("some").append(System.lineSeparator());
+        for (IndexNode idx : indexes) {
+            sb.append(idx.table).append(System.lineSeparator());
+            sb.append(idx.index).append(System.lineSeparator());
+        }
+        sb.append("!").append(System.lineSeparator());
+        sb.append("y").append(System.lineSeparator());
+        sb.append("y").append(System.lineSeparator());
+
+        return sb.toString();
     }
 
     /**
@@ -173,10 +143,10 @@ public class PCTIndexRebuild extends PCT {
         exec.createArg().setValue(db.getAbsolutePath());
         exec.createArg().setValue("-C");
         exec.createArg().setValue("idxbuild");
-        if (outputLog != null)
+        if (outputLog != null) {
             exec.setOutput(outputLog.getAbsoluteFile());
-        exec.setInput(tmpFile);
-        for (PCTRunOption option: options) {
+        }
+        for (PCTRunOption option : options) {
             exec.createArg().setValue(option.getName());
             if (option.getValue() != null)
                 exec.createArg().setValue(option.getValue());
@@ -186,12 +156,23 @@ public class PCTIndexRebuild extends PCT {
             exec.createArg().setValue(cpInternal);
         }
 
-        Environment.Variable var = new Environment.Variable();
-        var.setKey("DLC"); //$NON-NLS-1$
-        var.setValue(getDlcHome().toString());
-        exec.addEnv(var);
+        if (hasCmdLinePassphrase()) {
+            exec.createArg().setValue("-Passphrase");
+            exec.setInputString(getPassphraseFromCmdLine(passphraseCmdLine) + System.lineSeparator() + generateInputString());
+        } else {
+            exec.setInputString(generateInputString());
+        }
+
+        Environment.Variable envVar = new Environment.Variable();
+        envVar.setKey("DLC"); //$NON-NLS-1$
+        envVar.setValue(getDlcHome().toString());
+        exec.addEnv(envVar);
 
         return exec;
+    }
+
+    private boolean hasCmdLinePassphrase() {
+        return (passphraseCmdLine != null) && !passphraseCmdLine.trim().isEmpty();
     }
 
 }

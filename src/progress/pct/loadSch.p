@@ -1,5 +1,5 @@
 /**
- * Copyright 2005-2019 Riverside Software
+ * Copyright 2005-2026 Riverside Software
  *
  *  Licensed under the Apache License, Version 2.0 (the "License");
  *  you may not use this file except in compliance with the License.
@@ -21,7 +21,7 @@ DEFINE TEMP-TABLE ttUnfrozen NO-UNDO
    FIELD cTable AS CHARACTER.
 
 /*
- * Parameters from ANT call 
+ * Parameters from ANT call
  */
 DEFINE VARIABLE cFileList AS CHARACTER NO-UNDO.
 DEFINE VARIABLE cFile     AS CHARACTER NO-UNDO.
@@ -58,7 +58,7 @@ IF lUnfreeze THEN DO:
              hBuffer:BUFFER-FIELD("_frozen"):BUFFER-VALUE = FALSE.
       hQuery:GET-NEXT.
    END.
-   hQuery:QUERY-CLOSE().   
+   hQuery:QUERY-CLOSE().
 end.
 
 IF lOnline THEN

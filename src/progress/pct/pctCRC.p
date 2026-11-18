@@ -1,5 +1,5 @@
 /**
- * Copyright 2005-2019 Riverside Software
+ * Copyright 2005-2026 Riverside Software
  *
  *  Licensed under the Apache License, Version 2.0 (the "License");
  *  you may not use this file except in compliance with the License.
@@ -14,7 +14,7 @@
  *  limitations under the License.
  *
  */
- 
+
 DEFINE INPUT-OUTPUT PARAMETER TABLE-HANDLE hCRC.
 
 DEFINE VARIABLE i       AS INTEGER    NO-UNDO.

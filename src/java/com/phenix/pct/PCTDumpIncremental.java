@@ -1,5 +1,5 @@
 /**
- * Copyright 2005-2022 Riverside Software
+ * Copyright 2005-2026 Riverside Software
  *
  *  Licensed under the Apache License, Version 2.0 (the "License");
  *  you may not use this file except in compliance with the License.
@@ -125,7 +125,7 @@ public class PCTDumpIncremental extends PCTDynamicRun {
     @Override
     public void addDBConnection(PCTConnection dbConn) {
         throw new BuildException(
-                "DBConnection shouldn't be used in PCTDumpIncremental. Use sourceDb and targetDb instead");
+                "DBConnection should not be used in PCTDumpIncremental. Use sourceDb and targetDb instead");
     }
 
     /**

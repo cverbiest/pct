@@ -1,5 +1,5 @@
 /**
- * Copyright 2005-2022 Riverside Software
+ * Copyright 2005-2026 Riverside Software
  *
  *  Licensed under the Apache License, Version 2.0 (the "License");
  *  you may not use this file except in compliance with the License.
@@ -18,6 +18,7 @@ package com.phenix.pct;
 
 import org.apache.tools.ant.BuildException;
 import org.apache.tools.ant.Project;
+import org.apache.tools.ant.taskdefs.condition.Os;
 import org.apache.tools.ant.taskdefs.ExecTask;
 import org.apache.tools.ant.types.Environment;
 import org.apache.tools.ant.types.FileSet;
@@ -52,6 +53,7 @@ public class PCTLibrary extends PCT {
     private String cpCase = null;
     private boolean noCompress = false;
     private boolean debugPCT = false;
+    private boolean useForwardSlashes = false;
     private FileSet fileset = new FileSet();
     private List<FileSet> filesets = new ArrayList<>();
     private File baseDir = null;
@@ -219,6 +221,15 @@ public class PCTLibrary extends PCT {
     }
 
     /**
+     * Sets the use of / instead of \ on windows
+     * 
+     * @param useForwardSlashes  boolean
+     */
+    public void setUseForwardSlashes (boolean useForwardSlashes ) {
+        this.useForwardSlashes = useForwardSlashes ;
+    }
+
+    /**
      * Do the work
      * 
      * @throws BuildException Something went wrong
@@ -282,7 +293,7 @@ public class PCTLibrary extends PCT {
                 } catch (IOException caught) {
                     log(MessageFormat.format(Messages.getString("PCTLibrary.5"),
                             sharedFile.getAbsolutePath()), Project.MSG_VERBOSE);
-                    throw new BuildException("Can't create memory-mapped library", caught);
+                    throw new BuildException("Cannot create memory-mapped library", caught);
                 }
                 log(MessageFormat
                         .format(Messages.getString("PCTLibrary.8"), sharedFile.getAbsolutePath()));
@@ -416,6 +427,9 @@ public class PCTLibrary extends PCT {
                 if (resourceAsFile.equals(destFile)) {
                     throw new BuildException(Messages.getString("PCTLibrary.3"));
                 }
+     
+                if (Os.isFamily(Os.FAMILY_WINDOWS) && useForwardSlashes)
+                    str = str.replace('\\', '/');
 
                 // If there are spaces, don't put in the pf file
                 if ((str.indexOf(' ') == -1) && (str.length() < 128)) {

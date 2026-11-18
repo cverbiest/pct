@@ -1,5 +1,5 @@
 /**
- * Copyright 2005-2022 Riverside Software
+ * Copyright 2005-2026 Riverside Software
  *
  *  Licensed under the Apache License, Version 2.0 (the "License");
  *  you may not use this file except in compliance with the License.
@@ -43,9 +43,7 @@ public class AnalyticsBuildListener implements BuildListener {
         return ("DlcVersion".equalsIgnoreCase(task.getTaskType())
                 || "RestGen".equalsIgnoreCase(task.getTaskType())
                 || "ClassDocumentation".equalsIgnoreCase(task.getTaskType())
-                || "ABLDuck".equalsIgnoreCase(task.getTaskType())
-                || "ProUnit".equalsIgnoreCase(task.getTaskType())
-                || "OEUnit".equalsIgnoreCase(task.getTaskType())
+                || "JsonDocumentation".equalsIgnoreCase(task.getTaskType())
                 || "ABLUnit".equalsIgnoreCase(task.getTaskType()));
     }
 
@@ -85,7 +83,7 @@ public class AnalyticsBuildListener implements BuildListener {
             @Override
             public Void call() throws Exception {
                 try {
-                    final URL url = new URL("http://sonar-analytics.rssw.eu/write?db=sonar");
+                    final URL url = new URL("https://sonar-analytics.rssw.eu/write?db=sonar");
                     HttpURLConnection connx = (HttpURLConnection) url.openConnection();
                     connx.setRequestMethod("POST");
                     connx.setConnectTimeout(2000);

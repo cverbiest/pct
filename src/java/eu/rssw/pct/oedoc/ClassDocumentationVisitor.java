@@ -1,5 +1,5 @@
 /**
- * Copyright 2005-2022 Riverside Software
+ * Copyright 2005-2026 Riverside Software
  *
  *  Licensed under the Apache License, Version 2.0 (the "License");
  *  you may not use this file except in compliance with the License.
@@ -35,6 +35,7 @@ import com.openedge.pdt.core.ast.DestructorDeclaration;
 import com.openedge.pdt.core.ast.EnumDeclaration;
 import com.openedge.pdt.core.ast.EnumeratorItem;
 import com.openedge.pdt.core.ast.EventDeclaration;
+import com.openedge.pdt.core.ast.IndexDeclaration.IndexColumn;
 import com.openedge.pdt.core.ast.MethodDeclaration;
 import com.openedge.pdt.core.ast.ProgressParserTokenTypes;
 import com.openedge.pdt.core.ast.ProgressTokenTypes;
@@ -45,7 +46,6 @@ import com.openedge.pdt.core.ast.TemptableDeclaration;
 import com.openedge.pdt.core.ast.TypeDeclaration;
 import com.openedge.pdt.core.ast.TypeName;
 import com.openedge.pdt.core.ast.UsingDeclaration;
-import com.openedge.pdt.core.ast.IndexDeclaration.IndexColumn;
 import com.openedge.pdt.core.ast.model.IASTNode;
 import com.openedge.pdt.core.ast.model.IASTToken;
 import com.openedge.pdt.core.ast.model.IField;
@@ -79,9 +79,15 @@ public class ClassDocumentationVisitor extends ASTVisitor {
     private boolean firstTokenVisited = false;
     private List<String> firstComments = new ArrayList<>();
     private boolean gotEnum = false;
+    private boolean includeCommentsAfterASTNode = false;
 
     public ClassDocumentationVisitor(IPropath propath) {
+        this(propath, false);
+    }
+
+    public ClassDocumentationVisitor(IPropath propath, boolean includeCommentsAfterASTNode) {
         this.propath = propath;
+        this.includeCommentsAfterASTNode = includeCommentsAfterASTNode;
     }
 
     public String getPackageName() {
@@ -431,7 +437,7 @@ public class ClassDocumentationVisitor extends ASTVisitor {
     /**
      * Returns *last* comment
      */
-    private static String findPreviousComment(ASTNode node) {
+    private String findPreviousComment(ASTNode node) {
         if ((node.getHiddenPrevious() != null)
                 && (node.getHiddenPrevious().getType() == ProgressTokenTypes.ML__COMMENT)) {
             return node.getHiddenPrevious().getText();
@@ -445,16 +451,19 @@ public class ClassDocumentationVisitor extends ASTVisitor {
         }
 
         // If we find nothing lets try just after, for legacy reasons
-        for (IASTNode nd : node.getChildren()) {
-            if (nd.getType() == ProgressParserTokenTypes.EOS__COLON) {
-                IASTToken commentnode = nd.getHiddenNext();
-                if (commentnode != null
-                        && commentnode.getType() == ProgressTokenTypes.ML__COMMENT) {
-                    return commentnode.getText();
+        if (includeCommentsAfterASTNode) {
+            for (IASTNode nd : node.getChildren()) {
+                if (nd.getType() == ProgressParserTokenTypes.EOS__COLON) {
+                    IASTToken commentnode = nd.getHiddenNext();
+                    if (commentnode != null
+                            && commentnode.getType() == ProgressTokenTypes.ML__COMMENT) {
+                        return commentnode.getText();
+                    }
+                    break;
                 }
-                break;
             }
         }
+
         return null;
     }
 

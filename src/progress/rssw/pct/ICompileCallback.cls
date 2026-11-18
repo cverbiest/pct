@@ -1,5 +1,5 @@
 /**
- * Copyright 2005-2022 Riverside Software
+ * Copyright 2005-2026 Riverside Software
  *
  *  Licensed under the Apache License, Version 2.0 (the "License");
  *  you may not use this file except in compliance with the License.
@@ -15,9 +15,9 @@
  *
  */
 
-INTERFACE rssw.pct.ICompileCallback:
-    METHOD PUBLIC VOID initialize(hSrcProc AS HANDLE).
+interface rssw.pct.ICompileCallback:
+    method public void initialize(hSrcProc as handle).
     // 0 = No action, 1 = Skip file
-    METHOD PUBLIC INTEGER beforeCompile(hSrcProc AS HANDLE, ipInFile AS CHARACTER, ipInDir AS CHARACTER).
-    METHOD PUBLIC VOID afterCompile(hSrcProc AS HANDLE, ipInFile AS CHARACTER, ipInDir AS CHARACTER).
-END INTERFACE.
+    method public integer beforeCompile(hSrcProc as handle, ipInFile as character, ipInDir as character).
+    method public void afterCompile(hSrcProc as handle, ipInFile as character, ipInDir as character).
+end interface.

@@ -6,104 +6,122 @@ pipeline {
   options {
     disableConcurrentBuilds()
     buildDiscarder(logRotator(numToKeepStr: '10'))
-    timeout(time: 30, unit: 'MINUTES')
+    timeout(time: 45, unit: 'MINUTES')
     skipDefaultCheckout()
   }
 
   stages {
-    stage('Class documentation build') {
-      agent { label 'Windows-Office' }
+    stage('🏗️ Standard build') {
+      agent { label 'Linux-Office03' }
       steps {
-        checkout([$class: 'GitSCM', branches: scm.branches, extensions: scm.extensions + [[$class: 'CleanCheckout']], userRemoteConfigs: scm.userRemoteConfigs])
         script {
-          def antHome = tool name: 'Ant 1.9', type: 'ant'
-          def dlc11 = tool name: 'OpenEdge-11.7', type: 'openedge'
-          def dlc12 = tool name: 'OpenEdge-12.4', type: 'openedge'
-          def jdk = tool name: 'Corretto 11', type: 'jdk'
-          def version = readFile('version.txt').trim()
+          checkout([$class: 'GitSCM', branches: scm.branches, extensions: scm.extensions + [[$class: 'CleanCheckout']], userRemoteConfigs: scm.userRemoteConfigs])
+          // Ugly workaround: sonar-scanner requires the main branch to be present, but Jenkins only fetches the current branch
+          // An extra checkout is then done with a different refspec.
+          // There's probably a better way to do that, but no time for that (today)
+          checkout([$class: 'GitSCM', branches: scm.branches, extensions: scm.extensions + [[$class: 'CleanCheckout']], userRemoteConfigs: [[credentialsId: scm.userRemoteConfigs.credentialsId[0], url: scm.userRemoteConfigs.url[0], refspec: '+refs/heads/main:refs/remotes/origin/main']] ])
 
-          withEnv(["JAVA_HOME=${jdk}"]) {
-            bat "${antHome}\\bin\\ant -Dpct.release=${version} -DDLC11=${dlc11} -DDLC12=${dlc12} classDoc"
-          }
-        }
-        stash name: 'classdoc', includes: 'dist/classDoc.zip'
-      }
-    }
-
-    stage('Standard build') {
-      agent { label 'Linux-Office' }
-      steps {
-        checkout([$class: 'GitSCM', branches: scm.branches, extensions: scm.extensions + [[$class: 'CleanCheckout']], userRemoteConfigs: scm.userRemoteConfigs])
-        unstash name: 'classdoc'
-        script {
-          sh 'git rev-parse HEAD > head-rev'
+          env.GIT_AUTHOR = sh (script: 'git log --format="%ae" -n 1', returnStdout: true).trim()
+          sh 'git rev-parse --short HEAD > head-rev'
           def commit = readFile('head-rev').trim()
-          def jdk = tool name: 'Corretto 11', type: 'jdk'
-          def antHome = tool name: 'Ant 1.9', type: 'ant'
-          def dlc11 = tool name: 'OpenEdge-11.7', type: 'openedge'
-          def dlc12 = tool name: 'OpenEdge-12.4', type: 'openedge'
           def version = readFile('version.txt').trim()
 
-          withEnv(["TERM=xterm", "JAVA_HOME=${jdk}"]) {
-            sh "${antHome}/bin/ant -Dpct.release=${version} -DDLC11=${dlc11} -DDLC12=${dlc12} -DGIT_COMMIT=${commit} dist"
+          // Compile Java code first
+          docker.image('docker.rssw.eu/progress/dlc:12.8').inside('') {
+            sh "ant build"
+          }
+          docker.image('docker.rssw.eu/progress/dlc:13.1').inside('') {
+            sh "ant -Dpct.release=${version} -DDLC12=/ -DDLC13=/opt/progress/dlc pbuild"
+          }
+          docker.image('docker.rssw.eu/progress/dlc:12.8').inside('') {
+            sh "ant -Dpct.release=${version} -DDLC12=/opt/progress/dlc -DDLC13=/ -DGIT_COMMIT=${commit} dist"
           }
         }
-        stash name: 'tests', includes: 'dist/PCT.jar,dist/testcases.zip,tests.xml'
-        archiveArtifacts 'dist/PCT.jar,dist/PCT-javadoc.jar,dist/PCT-sources.jar'
+        stash name: 'unsigned', includes: 'dist/PCT.jar,eToken.cfg'
       }
     }
 
-    stage('Unit tests') {
+    stage('🔏 Package signature') {
+      agent { label 'Windows-Office02' }
+      environment {
+        KEYSTORE_ALIAS = credentials('KEYSTORE_ALIAS')
+        KEYSTORE_PASS = credentials('KEYSTORE_PASS')
+      }
       steps {
-        parallel branch1: { testBranch('Windows-Office', 'JDK8', 'Ant 1.10', 'OpenEdge-11.7', true, '11.7-Win', '') },
-                 branch2: { testBranch('Windows-Office', 'Corretto 11', 'Ant 1.10', 'OpenEdge-12.2', true, '12.2-Win', '') },
-                 branch4: { testBranch('Linux-Office02', 'JDK8', 'Ant 1.10', 'OpenEdge-11.7', false, '11.7-Linux', 'docker.rssw.eu/progress/dlc:11.7') },
-                 branch5: { testBranch('Linux-Office02', 'Corretto 11', 'Ant 1.10', 'OpenEdge-12.2', false, '12.2-Linux', 'docker.rssw.eu/progress/dlc:12.2') },
-                 branch6: { testBranch('Linux-Office02', 'Corretto 11', 'Ant 1.10', 'OpenEdge-12.6', false, '12.6-Linux', 'docker.rssw.eu/progress/dlc:12.6') },
+        unstash name: 'unsigned'
+        script {
+          withEnv(["PATH+JAVA=${tool name: 'JDK17', type: 'jdk'}\\bin"]) {
+            bat "jarsigner -tsa http://timestamp.sectigo.com -keystore NONE -storepass %KEYSTORE_PASS% -storetype PKCS11 -providerClass sun.security.pkcs11.SunPKCS11 -providerArg .\\eToken.cfg -signedjar dist\\PCT-signed.jar dist\\PCT.jar %KEYSTORE_ALIAS%"
+          }
+        }
+        stash name: 'signed', includes: 'dist/PCT-signed.jar'
+      }
+    }
+
+    stage('📦 Archive') {
+      agent { label 'Linux-Office03' }
+      steps {
+        unstash name: 'signed'
+        stash name: 'tests', includes: 'dist/PCT.jar,dist/PCT-signed.jar,dist/testcases.zip,tests.xml'
+        archiveArtifacts 'dist/PCT.jar,dist/PCT-signed.jar,dist/PCT-javadoc.jar,dist/PCT-sources.jar'
+      }
+    }
+
+    stage('🧪 Unit tests') {
+      steps {
+        parallel branch1: { testBranch('Windows-Office', 'Corretto 11', 'Ant 1.10', 'OpenEdge-12.2', true, '12.2-Win', '') },
+                 branch2: { testBranch('Windows-Office02', 'JDK17', 'Ant 1.10', 'OpenEdge-12.8', true, '12.8-Win', '') },
+                 branch3: { testBranch('Linux-Office03', 'Corretto 11', 'Ant 1.10', 'OpenEdge-12.2', false, '12.2-Linux', 'docker.rssw.eu/progress/dlc:12.2') },
+                 branch4: { testBranch('Linux-Office03', 'Corretto 11', 'Ant 1.10', 'OpenEdge-12.8', true, '12.8-Linux', 'docker.rssw.eu/progress/dlc:12.8') },
+                 branch5: { testBranch('Linux-Office03', 'JDK17', 'Ant 1.10', 'OpenEdge-13.1', true, '13.1-Linux', 'docker.rssw.eu/progress/dlc:13.1') },
+                 branch6: { testBranch('Windows-Office', 'JDK17', 'Ant 1.10', 'OpenEdge-13.1', true, '13.1-Win', '') },
                  failFast: false
       }
     }
 
-    stage('Unit tests reports') {
-      agent { label 'Linux-Office' }
+    stage('🗃️ Unit tests reports') {
+      agent { label 'Linux-Office03' }
       steps {
         // Wildcards not accepted in unstash...
-        unstash name: 'junit-11.7-Win'
-        unstash name: 'junit-11.7-Linux'
         unstash name: 'junit-12.2-Win'
+        unstash name: 'junit-12.8-Win'
+        unstash name: 'junit-13.1-Win'
         unstash name: 'junit-12.2-Linux'
-        unstash name: 'junit-12.6-Linux'
+        unstash name: 'junit-12.8-Linux'
+        unstash name: 'junit-13.1-Linux'
 
         sh "mkdir junitreports"
-        unzip zipFile: 'junitreports-11.7-Win.zip', dir: 'junitreports'
-        unzip zipFile: 'junitreports-11.7-Linux.zip', dir: 'junitreports'
-        unzip zipFile: 'junitreports-12.2-Win.zip', dir: 'junitreports'
-        unzip zipFile: 'junitreports-12.2-Linux.zip', dir: 'junitreports'
-        unzip zipFile: 'junitreports-12.6-Linux.zip', dir: 'junitreports'
+        unzip zipFile: 'junitreports-12.2-Win.zip', dir: 'junitreports', quiet: true
+        unzip zipFile: 'junitreports-12.8-Win.zip', dir: 'junitreports', quiet: true
+        unzip zipFile: 'junitreports-13.1-Win.zip', dir: 'junitreports', quiet: true
+        unzip zipFile: 'junitreports-12.2-Linux.zip', dir: 'junitreports', quiet: true
+        unzip zipFile: 'junitreports-12.8-Linux.zip', dir: 'junitreports', quiet: true
+        unzip zipFile: 'junitreports-13.1-Linux.zip', dir: 'junitreports', quiet: true
         junit 'junitreports/**/*.xml'
       }
     }
 
-    stage('Sonar') {
-      agent { label 'Linux-Office' }
+    stage('🔍️ Sonar') {
+      agent { label 'Linux-Office03' }
       steps {
-        unstash name: 'coverage-11.7-Win'
         unstash name: 'coverage-12.2-Win'
+        unstash name: 'coverage-12.8-Win'
+        unstash name: 'coverage-12.8-Linux'
+        unstash name: 'coverage-13.1-Win'
+        unstash name: 'coverage-13.1-Linux'
         script {
-          def antHome = tool name: 'Ant 1.9', type: 'ant'
-          def jdk = tool name: 'Corretto 11', type: 'jdk'
-          def dlc = tool name: 'OpenEdge-11.7', type: 'openedge'
           def version = readFile('version.txt').trim()
-
-          withEnv(["JAVA_HOME=${jdk}"]) {
-            sh "${antHome}/bin/ant -lib lib/jacocoant-0.8.7.jar -file sonar.xml -DDLC=${dlc} init-sonar"
+          docker.image('docker.rssw.eu/progress/dlc:12.8').inside('') {
+            sh 'ant -lib lib/jacocoant-0.8.14.jar -file sonar.xml -DDLC=/opt/progress/dlc init-sonar' 
           }
-          withEnv(["PATH+SCAN=${tool name: 'SQScanner4', type: 'hudson.plugins.sonar.SonarRunnerInstallation'}/bin", "JAVA_HOME=${jdk}"]) {
+          docker.image('sonarsource/sonar-scanner-cli:latest').inside('') {
             withSonarQubeEnv('RSSW') {
-              if ('master' == env.BRANCH_NAME) {
-                sh "sonar-scanner -Dsonar.projectVersion=${version} -Dsonar.oe.dlc=${dlc} -Dsonar.branch.name=$BRANCH_NAME"
-              } else {
-                sh "sonar-scanner -Dsonar.projectVersion=${version} -Dsonar.oe.dlc=${dlc} -Dsonar.pullrequest.branch=$BRANCH_NAME -Dsonar.pullrequest.base=master -Dsonar.pullrequest.key=0"
+              withEnv(["SONAR_USER_HOME=/tmp"]) {
+                if ("main" == env.BRANCH_NAME) {
+                  sh "sonar-scanner -Dsonar.branch.name=${env.BRANCH_NAME} -Dsonar.projectVersion=${version}"
+                } else {
+                  sh "sonar-scanner -Dsonar.branch.name=${env.BRANCH_NAME} -Dsonar.newCode.referenceBranch=main -Dsonar.branch.target=main -Dsonar.projectVersion=${version}"
+                }
               }
             }
           }
@@ -111,30 +129,61 @@ pipeline {
       }
     }
 
-    stage('Maven Central') {
-      agent { label 'Linux-Office' }
+    stage('📦 Maven Central') {
+      environment {
+        MAVEN_GPG_PASSPHRASE=credentials('GPG_KEY')
+        BEARER_TOKEN=credentials('MavenCentralBearer')
+      }
+      agent { label 'Linux-Office03' }
       steps {
         script {
-          def jdk = tool name: 'Corretto 11', type: 'jdk'
+          def jdk = tool name: 'JDK17', type: 'jdk'
           def mvn = tool name: 'Maven 3', type: 'maven'
+          def ant = tool name: 'Ant 1.10', type: 'ant'
           def version = readFile('version.txt').trim()
 
-          // When script is executed, go to https://oss.sonatype.org/#stagingRepositories, then close and release the staging repository
-          // It then takes a few minutes before artifacts are visible in Maven Central
           withEnv(["MAVEN_HOME=${mvn}", "JAVA_HOME=${jdk}"]) {
             if (!version.endsWith('-pre')) {
-              sh "$MAVEN_HOME/bin/mvn -B -ntp gpg:sign-and-deploy-file -Durl=https://oss.sonatype.org/service/local/staging/deploy/maven2 -DrepositoryId=ossrh -DpomFile=alt-pom.xml -Dfile=dist/PCT.jar -Pgpg"
-              sh "$MAVEN_HOME/bin/mvn -B -ntp gpg:sign-and-deploy-file -Durl=https://oss.sonatype.org/service/local/staging/deploy/maven2 -DrepositoryId=ossrh -DpomFile=alt-pom.xml -Dfile=dist/PCT-sources.jar -Dclassifier=sources -Pgpg"
-              sh "$MAVEN_HOME/bin/mvn -B -ntp gpg:sign-and-deploy-file -Durl=https://oss.sonatype.org/service/local/staging/deploy/maven2 -DrepositoryId=ossrh -DpomFile=alt-pom.xml -Dfile=dist/PCT-javadoc.jar -Dclassifier=javadoc -Pgpg"
+              // Manually create and upload bundle to Maven Central. It's probably possible to do that with the maven-publish plugin, but as build is done with Ant, it's easier to do it manually.
+              // https://central.sonatype.org/publish/publish-portal-api/
+              // https://central.sonatype.org/publish/publish-portal-upload/
+              sh "mkdir bundle && cp alt-pom.xml bundle/pct-${version}.pom && cp dist/PCT.jar bundle/pct-${version}.jar && cp dist/PCT-sources.jar bundle/pct-${version}-sources.jar && cp dist/PCT-javadoc.jar bundle/pct-${version}-javadoc.jar"
+              sh "gpg --pinentry-mode loopback --passphrase \${MAVEN_GPG_PASSPHRASE} --armor --output bundle/pct-${version}.jar.asc --detach-sign bundle/pct-${version}.jar"
+              sh "gpg --pinentry-mode loopback --passphrase \${MAVEN_GPG_PASSPHRASE} --armor --output bundle/pct-${version}-sources.jar.asc --detach-sign bundle/pct-${version}-sources.jar"
+              sh "gpg --pinentry-mode loopback --passphrase \${MAVEN_GPG_PASSPHRASE} --armor --output bundle/pct-${version}-javadoc.jar.asc --detach-sign bundle/pct-${version}-javadoc.jar"
+              sh "gpg --pinentry-mode loopback --passphrase \${MAVEN_GPG_PASSPHRASE} --armor --output bundle/pct-${version}.pom.asc --detach-sign bundle/pct-${version}.pom"
+
+              sh "${ant}/bin/ant -Dversion=${version} central-bundle"
+
+              sh 'curl --request POST --header "Authorization: Bearer \${BEARER_TOKEN}" --form bundle=@central-bundle.zip \'https://central.sonatype.com/api/v1/publisher/upload?name=pct&publishingType=USER_MANAGED\''
+              mail body: "https://central.sonatype.com/publishing/deployments", to: "g.querret@riverside-software.fr", subject: "pct - Publish artifact on Central"
             }
           }
         }
       }
     }
   }
+
+  post {
+    unstable {
+      script {
+        mail body: "Check console output at ${BUILD_URL}console", to: "jenkins-reports@riverside-software.fr,${env.GIT_AUTHOR}", subject: "PCT ${BRANCH_NAME} build is unstable"
+      }
+    }
+    failure {
+      script {
+        mail body: "Check console output at ${BUILD_URL}console", to: "jenkins-reports@riverside-software.fr,${env.GIT_AUTHOR}", subject: "PCT ${BRANCH_NAME} build failure"
+      }
+    }
+    fixed {
+      script {
+        mail body: "Console output at ${BUILD_URL}console", to: "jenkins-reports@riverside-software.fr,${env.GIT_AUTHOR}", subject: "PCT ${BRANCH_NAME} build is back to normal"
+      }
+    }
+  }
 }
 
-def testBranch(nodeName, jdkVersion, antVersion, dlcVersion, stashCoverage, label, docker) {
+def testBranch(nodeName, jdkVersion, antVersion, dlcVersion, stashCoverage, label, dockerImg) {
   node(nodeName) {
     ws {
       deleteDir()
@@ -142,11 +191,23 @@ def testBranch(nodeName, jdkVersion, antVersion, dlcVersion, stashCoverage, labe
       def jdk = tool name: jdkVersion, type: 'jdk'
       def antHome = tool name: antVersion, type: 'ant'
       unstash name: 'tests'
-      withEnv(["TERM=xterm", "JAVA_HOME=${jdk}"]) {
-        if (isUnix()) {
-          sh "podman run --rm -v ${env.WORKSPACE}:/pct:z -w /pct ${docker} /opt/progress/dlc/ant/bin/ant -DDLC=/opt/progress/dlc -DPROFILER=true -DTESTENV=${label} -lib dist/PCT.jar -f tests.xml init dist"
-        } else
-          bat "${antHome}/bin/ant -lib dist/PCT.jar -DDLC=${dlc} -DPROFILER=true -DTESTENV=${label} -f tests.xml init dist"
+      if (isUnix()) {
+        configFileProvider([configFile(fileId: 'MvnSettingsRSSW', targetLocation: 'tmpDir/settings.xml')]) {
+          docker.image(dockerImg).inside('') {
+            sh "mkdir local_repo"
+            sh "> pwd.txt pwd"
+            def pwd = readFile('pwd.txt').trim()
+            withEnv(["MAVEN_SETTINGS=${pwd}/tmpDir/settings.xml", "LOCAL_M2_REPO=${pwd}/local_repo"]) {
+              sh "ant -DDLC=/opt/progress/dlc -DPROFILER=true -DTESTENV=${label} -lib dist/PCT-signed.jar -f tests.xml init dist"
+            }
+          }
+        }
+      } else {
+        configFileProvider([configFile(fileId: 'MvnSettingsRSSW', variable: 'MAVEN_SETTINGS')]) {
+          withEnv(["JAVA_HOME=${jdk}"]) {
+            bat "${antHome}/bin/ant -lib dist/PCT.jar -DDLC=${dlc} -DPROFILER=true -DTESTENV=${label} -f tests.xml init dist"
+          }
+        }
       }
       stash name: "junit-${label}", includes: 'junitreports-*.zip'
       archiveArtifacts 'emailable-report-*.html'

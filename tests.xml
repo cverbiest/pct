@@ -16,11 +16,11 @@
     <not><isset property="OE_MAJOR_VERSION" /></not>
   </condition>
   <!-- Groups to be executed depending on OpenEdge major version -->
-  <condition property="GROUPS" value="v11">
-    <equals arg1="${OE_MAJOR_VERSION}" arg2="11" />
-  </condition>
   <condition property="GROUPS" value="v11,v12">
     <equals arg1="${OE_MAJOR_VERSION}" arg2="12" />
+  </condition>
+  <condition property="GROUPS" value="v11,v12,v13">
+    <equals arg1="${OE_MAJOR_VERSION}" arg2="13" />
   </condition>
 
   <!-- Excluded group depending on OS -->
@@ -28,11 +28,11 @@
     <os family="windows" />
   </condition>
   <!-- Excluded group depending on version -->
-  <condition property="EXCLUDES-VERSION" value="nov12" else="">
+  <condition property="EXCLUDES-VERSION" value="nov12">
     <equals arg1="${OE_MAJOR_VERSION}" arg2="12" />
   </condition>
-  <condition property="VERSION" value="dlc${OE_MAJOR_VERSION}" else="dlc11">
-    <isset property="OE_MAJOR_VERSION" />
+  <condition property="EXCLUDES-VERSION" value="nov13">
+    <equals arg1="${OE_MAJOR_VERSION}" arg2="13" />
   </condition>
 
   <path id="test.run.cp">
@@ -46,7 +46,7 @@
     <fileset dir="lib" includes="testng-6.13.1.jar,jcommander-1.30.jar" />
   </path>
   <path id="jacoco.cp">
-    <fileset dir="lib" includes="jacocoant-0.8.7.jar" />
+    <fileset dir="lib" includes="jacocoant-0.8.14.jar" />
   </path>
 
   <target name="init">
@@ -72,11 +72,14 @@
     <mkdir dir="profiler" />
     <taskdef resource="testngtasks" classpathref="testng.cp" />
     <taskdef uri="antlib:org.jacoco.ant" resource="org/jacoco/ant/antlib.xml" classpathref="jacoco.cp" />
+    <echo message="Execute unit tests -- Groups ${GROUPS} -- Excludes ${EXCLUDES-OS},${EXCLUDES-VERSION} -- Suite ${TESTENV} -- DLC ${DLC}" />
     <jacoco:coverage destFile="profiler/jacoco-${TESTENV}.exec">
       <testng workingDir="testbox" outputdir="test-output" useDefaultListeners="true" groups="${GROUPS}" excludedGroups="${EXCLUDES-OS},${EXCLUDES-VERSION}" suiteName="${TESTENV} tests">
         <classfileset dir="build/test" includes="**/*Test.class" excludes="**/*BrokerTest.class" />
         <classpath refid="test.run.cp" />
-        <jvmarg line="-DDLC=&quot;${DLC}&quot; -DPROFILER=${PROFILER} -DTESTLIBS=${TESTLIBS} -DVERSION=${VERSION}" />
+        <jvmarg line="-Duser.language=en -DDLC=&quot;${DLC}&quot; -DPROFILER=${PROFILER} -DTESTLIBS=${TESTLIBS} -DVERSION=${VERSION}" />
+        <env key="ADMIN_PASSPHRASE" value="Admin#234" />
+        <env key="USER_PASSPHRASE" value="User#234" />
       </testng>
     </jacoco:coverage>
   </target>

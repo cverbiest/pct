@@ -1,5 +1,5 @@
 /**
- * Copyright 2005-2022 Riverside Software
+ * Copyright 2005-2026 Riverside Software
  *
  *  Licensed under the Apache License, Version 2.0 (the "License");
  *  you may not use this file except in compliance with the License.
@@ -30,7 +30,7 @@ import java.util.List;
 import java.util.Map;
 
 /**
- * Object to add a database connection to a PCTRun task
+ * Represent a database connection in PCT tasks
  * 
  * @author <a href="mailto:g.querret+PCT@gmail.com">Gilles QUERRET </a>
  */
@@ -49,8 +49,9 @@ public class PCTConnection extends DataType {
     private File paramFile = null;
     private Boolean singleUser = null;
     private Boolean readOnly = null;
-    private String passphrase = null;
-    private Map<String, PCTAlias> aliases = null;
+    private String passphraseCmdLine = null;
+    private Map<String, PCTAlias> aliases = new HashMap<>();
+    private List<PCTRunOption> options = null;
 
     /**
      * Database physical name (<CODE>-db</CODE> parameter)
@@ -174,10 +175,10 @@ public class PCTConnection extends DataType {
     }
 
     /**
-     * If true, append -Passphrase to connection string
+     * The passphrase will be read from the output of this command line
      */
-    public void setPassphrase(String passphrase) {
-        this.passphrase = passphrase;
+    public void setPassphraseCmdLine(String passphraseCmdLine) {
+        this.passphraseCmdLine = passphraseCmdLine;
     }
 
     /**
@@ -189,8 +190,15 @@ public class PCTConnection extends DataType {
         this.singleUser = singleUser;
     }
 
+    public void addOption(PCTRunOption option) {
+        if (options == null) {
+            options = new ArrayList<>();
+        }
+        options.add(option);
+    }
+
     /**
-     * Adds an alias to the current DB connection.
+     * Add an alias to the current DB connection.
      * 
      * The previous method's name (addPCTAlias) was changed when I switched from Vector to HashMap
      * as a container for PCTAlias. When using addPCTAlias, you enter the method with a newly
@@ -204,10 +212,6 @@ public class PCTConnection extends DataType {
     }
 
     public void addConfiguredAlias(PCTAlias alias) {
-        if (this.aliases == null) {
-            aliases = new HashMap<>();
-        }
-
         if (aliases.put(alias.getName(), alias) != null)
             throw new BuildException(MessageFormat.format(
                     Messages.getString("PCTConnection.0"), alias.getName())); //$NON-NLS-1$
@@ -217,8 +221,13 @@ public class PCTConnection extends DataType {
         return (PCTConnection) getCheckedRef();
     }
 
+    public boolean hasCmdLinePassphrase() {
+        return (Boolean.TRUE.equals(singleUser) || Boolean.TRUE.equals(readOnly))
+                && (passphraseCmdLine != null) && !passphraseCmdLine.trim().isEmpty();
+    }
+
     /**
-     * Checks if aliases defined
+     * Check if aliases defined
      * 
      * @return True if aliases defined for this database connection
      */
@@ -228,7 +237,7 @@ public class PCTConnection extends DataType {
     }
 
     /**
-     * Checks if an alias is defined
+     * Check if an alias is defined
      * 
      * @param aliasName String
      * @return True if alias defined for this database connection
@@ -239,7 +248,7 @@ public class PCTConnection extends DataType {
     }
 
     /**
-     * Returns an ordered list of connection parameters
+     * Return a list of connection parameters
      * 
      * @return List of String
      * @throws BuildException Something went wrong (dbName or paramFile not defined)
@@ -284,13 +293,11 @@ public class PCTConnection extends DataType {
 
         if (singleUser != null) {
             if (singleUser) {
-                list.add("-1"); //$NON-NLS-1$    
-            }
-            else {
+                list.add("-1"); //$NON-NLS-1$
+            } else {
                 list.remove("-1");
-         }
+            }
         }
-       
 
         if (cacheFile != null) {
             list.add("-cache"); //$NON-NLS-1$
@@ -312,19 +319,12 @@ public class PCTConnection extends DataType {
             list.add(hostName);
         }
 
-        if (readOnly != null ) {
+        if (readOnly != null) {
             if (readOnly) {
                 list.add("-RO");
-            }
-            else
-            {
+            } else {
                 list.remove("-RO");
             }
-        }
-
-        if (passphrase != null) {
-            list.add("-KeyStorePassPhrase");
-            list.add(passphrase);
         }
 
         if ((userName != null) && (userName.trim().length() > 0)) {
@@ -336,11 +336,22 @@ public class PCTConnection extends DataType {
             }
         }
 
+        if (options != null) {
+            for (PCTRunOption opt : options) {
+                if (opt.getName() == null) {
+                    throw new BuildException("PCTRun.8"); //$NON-NLS-1$
+                }
+                list.add(opt.getName());
+                if (opt.getValue() != null)
+                    list.add(opt.getValue());
+            }
+        }
+
         return list;
 
     }
     /**
-     * Returns a string which could be used by a CONNECT statement or directly in a _progres or
+     * Return a string which could be used by a CONNECT statement or directly in a _progres or
      * prowin32 command line
      * 
      * @return Connection string
@@ -349,21 +360,26 @@ public class PCTConnection extends DataType {
     public String createConnectString() {
         StringBuilder sb = new StringBuilder();
         for (String str : getConnectParametersList()) {
-            String s = PCTRun.escapeString(str);
+            String s = PCT.escapeString(str);
             sb.append((s.indexOf(' ') == -1 ? s : "'" + s + "'")).append(' '); //$NON-NLS-1$ //$NON-NLS-2$
         }
         return sb.toString();
     }
 
     /**
-     * Returns a string which could be used to connect a database from a background worker Pipe
-     * separated list, first entry is connection string, followed by aliases. Aliases are comma
-     * separated list, first entry is alias name, second is 1 if NO-ERROR, 0 w/o no-error
+     * Return a string which could be used to connect a database from a background worker. Pipe
+     * separated list, first entry is connection string, second entry contains passphrase mode,
+     * third entry is the value of the passphrase mode, then followed by aliases. Aliases are
+     * comma-separated lists, first entry is alias name, second is 1 if NO-ERROR, 0 w/o no-error
      * 
      * @return Connection string
      */
     public String createBackgroundConnectString() {
-        StringBuilder sb = new StringBuilder(createConnectString());
+        StringBuilder sb = new StringBuilder(createConnectString()).append('|');
+        if (hasCmdLinePassphrase())
+            sb.append("cmdline|").append(passphraseCmdLine);
+        else
+            sb.append("|");
         if (hasAliases()) {
             for (PCTAlias alias : getAliases()) {
                 sb.append('|').append(alias.getName()).append(',')
@@ -387,16 +403,14 @@ public class PCTConnection extends DataType {
     }
 
     /**
-     * Returns defined aliases for a database connection
+     * Return defined aliases for a database connection
      * 
      * @return Collection
      */
     public Collection<PCTAlias> getAliases() {
         Map<String, PCTAlias> map = new HashMap<>();
-        if (aliases != null) {
-            for (String str : aliases.keySet()) {
-                map.put(str, aliases.get(str));
-            }
+        for (Map.Entry<String, PCTAlias> entry : aliases.entrySet()) {
+            map.put(entry.getKey(), entry.getValue());
         }
         if (isReference()) {
             for (PCTAlias alias : getRef().getAliases()) {
@@ -408,7 +422,7 @@ public class PCTConnection extends DataType {
     }
 
     /**
-     * Returns database name
+     * Return database name
      * 
      * @return String
      */
@@ -422,4 +436,7 @@ public class PCTConnection extends DataType {
         }
     }
 
+    public String getPassphraseCmdLine() {
+        return passphraseCmdLine;
+    }
 }

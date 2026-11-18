@@ -1,5 +1,5 @@
 /**
- * Copyright 2005-2019 Riverside Software
+ * Copyright 2005-2026 Riverside Software
  *
  *  Licensed under the Apache License, Version 2.0 (the "License");
  *  you may not use this file except in compliance with the License.
@@ -18,10 +18,14 @@
 DEFINE VARIABLE cDir AS CHARACTER NO-UNDO.
 DEFINE VARIABLE cTables AS CHARACTER NO-UNDO.
 DEFINE VARIABLE cEncoding AS CHARACTER NO-UNDO.
+DEFINE VARIABLE hProc AS HANDLE NO-UNDO.
 
 ASSIGN cDir    = DYNAMIC-FUNCTION('getParameter' IN SOURCE-PROCEDURE, INPUT 'destDir')
        cTables = DYNAMIC-FUNCTION('getParameter' IN SOURCE-PROCEDURE, INPUT 'tables')
        cEncoding = DYNAMIC-FUNCTION('getParameter' IN SOURCE-PROCEDURE, INPUT 'encoding').
 
-RUN prodict/dump_d.p (cTables, cDir, cEncoding).
+RUN prodict/dump_d.p PERSISTENT SET hProc (cTables, cDir, cEncoding).
+RUN doDump IN hProc.
+DELETE PROCEDURE hProc.
+
 RETURN RETURN-VALUE.

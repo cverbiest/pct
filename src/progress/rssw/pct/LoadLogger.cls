@@ -1,5 +1,5 @@
 /**
- * Copyright 2005-2022 Riverside Software
+ * Copyright 2005-2026 Riverside Software
  *
  *  Licensed under the Apache License, Version 2.0 (the "License");
  *  you may not use this file except in compliance with the License.
@@ -57,13 +57,13 @@ CLASS rssw.pct.LoadLogger INHERITS rssw.pct.AbstractLoadLogger:
     ASSIGN errors = errors + pcText + "~n".
 
   END METHOD.
-    
+
   METHOD PUBLIC OVERRIDE VOID AddPhase2Error( pcText as character ) :
     THIS-OBJECT:numErrors = THIS-OBJECT:numErrors + 1.
     MESSAGE pcText.
     errors = errors + pcText + "~n".
   END METHOD.
-    
+
   METHOD PUBLIC OVERRIDE VOID AddWarning( pcText as character ) :
     THIS-OBJECT:numWarnings = THIS-OBJECT:numWarnings + 1.
     MESSAGE pcText.

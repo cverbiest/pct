@@ -1,5 +1,5 @@
 /**
- * Copyright 2005-2022 Riverside Software
+ * Copyright 2005-2026 Riverside Software
  *
  *  Licensed under the Apache License, Version 2.0 (the "License");
  *  you may not use this file except in compliance with the License.
@@ -23,7 +23,6 @@ import java.text.MessageFormat;
 import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.List;
-import java.util.Map;
 import java.util.SortedSet;
 import java.util.TreeSet;
 
@@ -81,7 +80,12 @@ public class PCTBgCompile extends PCTBgRun {
 
     @Override
     public void setProcedure(String procedure) {
-        throw new BuildException("Can't set procedure attribute");
+        throw new BuildException("Cannot set procedure attribute");
+    }
+
+    @Override
+    public void setClassName(String className) {
+        throw new BuildException("Cannot set className attribute");
     }
 
     /**
@@ -126,6 +130,10 @@ public class PCTBgCompile extends PCTBgRun {
                 this.cleanup();
                 throw new BuildException(Messages.getString("PCTCompile.39")); //$NON-NLS-1$
             }
+        }
+
+        if (compAttrs.isRequireReturnValues() && getVersion().compareTo(new DLCVersion(12, 2, "0")) < 0) {
+            log("Skip requireReturnValues attribute, as it is set to true but not available in this version of OpenEdge");
         }
 
         log(Messages.getString("PCTCompile.40"), Project.MSG_INFO); //$NON-NLS-1$
@@ -306,11 +314,6 @@ public class PCTBgCompile extends PCTBgRun {
             }
         }
 
-        @Override
-        public void setCustomOptions(Map<String, String> options) {
-            // No-op
-        }
-
         private String getOptions() {
             StringBuilder sb = new StringBuilder();
             sb.append(Boolean.toString(compAttrs.isRunList())).append(';');
@@ -319,7 +322,7 @@ public class PCTBgCompile extends PCTBgRun {
             sb.append(Boolean.toString(compAttrs.isXcode())).append(';');
             sb.append("").append(';');
             sb.append(Boolean.toString(compAttrs.isForceCompile())).append(';');
-            sb.append(Boolean.toString(false /* FIXME noCompile */)).append(';');
+            sb.append(Boolean.toString(false)).append(';'); // Previously noCompile
             sb.append(Boolean.toString(compAttrs.isKeepXref())).append(';');
             sb.append("").append(';'); // Previously languages
             sb.append("").append(';'); // Previously growth factor
@@ -349,7 +352,8 @@ public class PCTBgCompile extends PCTBgRun {
             sb.append(Boolean.toString(compAttrs.isRequireFieldQualifiers())).append(';');
             sb.append(compAttrs.getCallbackClass() == null ? "" : compAttrs.getCallbackClass()).append(';');
             sb.append(CompilationAttributes.CONSOLE_OUTPUT_TYPE).append(';');
-            sb.append(Boolean.toString(compAttrs.isRequireReturnValues())).append(';');
+            sb.append(Boolean.toString(getVersion().compareTo(new DLCVersion(12, 2, "0")) >= 0
+                    && compAttrs.isRequireReturnValues())).append(';');
 
             return sb.toString();
         }
@@ -378,6 +382,8 @@ public class PCTBgCompile extends PCTBgRun {
                     if (compAttrs.isStopOnError())
                         setStatusQuit();
                 }
+            } else {
+                logMessages(returnValues);
             }
         }
     }
